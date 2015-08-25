@@ -1,0 +1,687 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% LaTeX template
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\documentclass[10pt, fleqn]{article}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% PACKAGES 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%
+% T1: 8-bit encoding to allow codepoints for 
+%     fonts with up to 256 glyphs
+% 
+%     Without T1, the following problems arise:    
+%         -Cannot use many newer fonts
+%         -Words containing accented characters 
+%          cannot be hyphenated
+%         -You cannot copy-and-paste words with
+%          accented characters from the output 
+%          (DVI/PS/PDF)
+%         -Characters like '|', '<', and '>' 
+%          can render in unexpected ways. 
+%
+\usepackage[T1]{fontenc} 
+
+%
+% Allows specification of arbitrary font size,
+% even sizes not listed in the .fd file.
+%
+%        \fontsize{...}{...}\selectfont
+%
+% The nearest size is selected, then scaled to
+% the requested size.
+\usepackage{anyfontsize}
+
+%
+% Math script text will use the 'Euler' font
+% rather than the default.
+%
+%        \mathscr{...} 
+\usepackage[mathscr]{euscript} 
+
+%
+% AMS Packages
+%
+\usepackage{amsmath}           % AMS package providing \equation, \align, etc. 
+\usepackage{amssymb}           % AMS package providing math symbols 
+\usepackage{amsthm}            % AMS package providing theorem environments
+
+%
+% Graphics
+%
+\usepackage{graphicx}          % Allows different kinds of image to be embedded 
+\usepackage{wrapfig}           % Allows text wrap around embedded figures 
+\usepackage{hyperref}          % Allows creation of hyperlinks
+
+% 
+% Page geometry
+%
+\usepackage{fullpage}          % Uncomment to enable the full page to be used
+\usepackage{changepage}        % Allows mod. of page geometry (\adjustwidth)
+\usepackage{fancyhdr}          % Allows definition of page headers
+\usepackage{marginnote}        % Allows margin notes
+
+%
+% Columns and margins
+%
+\usepackage{multicol}          % Provides '\begin{multicols}{n}' 
+\usepackage{parcolumns}        % Provides '\lcolumn', '\rcolumn' environments 
+\usepackage{enumitem}          % Provides '\enumerate' environment enhancements
+\usepackage{marginnote}        % Provides '\marginnote' environment 
+
+%
+% Special symbols
+%
+\usepackage{turnstile}         % Turnstile symbols, like |-, |=
+\usepackage{cancel}            % Lets you negate anything with a slash 
+\usepackage{mathtools}         % \xrightarrow{hello} for hello
+                               %                         ---->
+
+% 
+% Boxes and structure
+%
+\usepackage{framed}            % \framed{...}           Draw a framed box
+                               % \oframed{...}          Open at page breaks
+                               % \shaded{...}           Shade 
+                               % \shaded*{...}          Shade to margin
+                               % \snugshade{...}        Shade fit
+                               % \snugshade*{...}       Shade fit to margin
+                               % \leftbar{...}          Bar on left side
+                               % \titled-frame{...}     Frame with title bar
+
+\usepackage{fancybox}          % \doublebox{...} \shadowbox{...} \ovalbox{...}
+\usepackage{color}             % \color[rgb]{r,g,b}{...}
+
+\usepackage{minted}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ENVIRONMENTS 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%
+%       \begin{problemset}
+%               \item[1] Something
+%               \item[2] Another
+%       \end{problemset}
+%
+\newenvironment{problemset}{\begin{enumerate}[widest={5.2}]}{\end{enumerate}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% COMMANDS 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%
+% \marginal{...} 
+% --------------
+% Margin notes with footnote-sized text. 
+%
+\newcommand{\marginal}[1]{\marginnote{\footnotesize #1 \\}}
+
+%
+% \lcolumn{...}, 
+% \rcolumn{...}
+% ----------------------------
+% Columns for use in 'multicol' environment
+%
+\newcommand{\lcolumn}[1]{\colchunk{#1}}
+\newcommand{\rcolumn}[2]{\colchunk{{#1}}\colplacechunks}
+
+%
+% \sequence{...}
+% --------------
+% Sequence in angle brackets <a, b, c, ...>
+%
+\newcommand{\sequence}[1]{\langle #1 \rangle}
+
+%
+% \scr{...}
+% ---------
+% A shorter way to specify \mathscr{...}
+%
+\newcommand{\scr}[1]{\mathscr{#1}}
+
+%
+% \setcmp{...}
+% ------------
+% Shortcut for set complement notated 'A \ B'.
+%
+\newcommand{\setcmp}[2]{#1\setminus{#2}}
+
+%
+% \setc{...}
+% ----------
+% Shortcut for set complement notatetd 'A^c'.
+%
+\newcommand{\setc}[1]{#1^{\mathsf{c}}}
+
+%
+% \vx{...}
+% --------
+% Vector version of a symbol (bold)
+%
+\newcommand{\vx}[1]{\mathbf{#1}}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THEOREMS 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%
+%       \newtheoremstyle{stylename}     name of the style to be used
+%               {spaceabove}            measure of space to leave above theorem
+%               {spacebelow}            measure of space to leave below theorem
+%               {bodyfont}              font to use in the body of the theorem
+%               {indent}                measure of space to indent
+%               {headfont}              font to use in the head of the theorem
+%               {headpunctuation}       punctuation between head and body
+%               {headspace}             space after theorem head; " " = normal 
+%               {headspec}              manually specify head
+%
+\newtheoremstyle{break}% 
+    {}%                    Space above, empty = `usual value'
+    {}%                    Space below
+    {}%                    Body font (no italic for cheatsheet)
+    {}%                    Indent (empty=no indent, \parindent=para indent)
+    {\bfseries}%           Thm head font
+    {.}%                   Punctuation after thm head
+    {\newline}%            Space after thm head: \newline = linebreak
+    {}%                    Thm head spec
+
+% Set the default theorem style
+\theoremstyle{break}
+
+% Conjecture 
+\newtheorem{conjecture}{Conjecture}[section]
+\newtheorem*{conjecture*}{Conjecture}
+
+% Postulate 
+\newtheorem{postulate}{Postulate}[section]
+\newtheorem*{postulate*}{Postulate}
+
+% Principle
+\newtheorem{principle}{Principle}[section]
+\newtheorem*{principle*}{Principle}
+
+% Axiom 
+\newtheorem{axiom}{Axiom}[section]
+\newtheorem*{axiom*}{Axiom}
+
+% Definition
+\newtheorem*{definition}{Definition}
+\newtheorem*{definition*}{Definition}
+
+% Proposition
+\newtheorem{proposition}{Proposition}[section]
+\newtheorem*{proposition*}{Proposition}
+
+% Claim 
+\newtheorem{claim}{Claim}[section]
+\newtheorem*{claim*}{Claim}
+
+% Porism 
+\newtheorem{porism}{Porism}[section]
+\newtheorem*{porism*}{Porism}
+
+% Theorem 
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem*{theorem*}{Theorem}
+
+% Lemma
+\newtheorem{lemma}{Lemma}[section]
+\newtheorem*{lemma*}{Lemma}
+
+% Corollary
+\newtheorem{corollary}{Corollary}[section]
+\newtheorem*{corollary*}{Corollary}
+
+% Intuition 
+\newtheorem{intuition}{Intuition}[section]
+\newtheorem*{intuition*}{Intuition}
+
+% Consequence 
+\newtheorem{consequence}{Consequence}[section]
+\newtheorem*{consequence*}{Consequence}
+
+% Remark
+\newtheorem*{remark}{Remark}
+\newtheorem*{remark*}{Remark}
+
+% Example
+\newtheorem{example}{Example}[section]
+\newtheorem*{example*}{Example}
+
+% Counterexample 
+\newtheorem{counterexample}{Counterexample}[section]
+\newtheorem*{counterexample*}{Counterexample}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% SYMBOLS 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%
+% These Greek letters are the same as their Latin
+% equivalents, so there is no special command in
+% LaTeX to indicate their use.
+%
+% However, for clarity, we have aliased them to their
+% Greek names here. 
+%
+% NOTE:
+% \mbox{...} resets its contents to text mode by 
+% default, so these letters will not be in italic 
+% when you print them in math mode.
+%
+\newcommand{\Alpha}  {\mbox{A}}
+\newcommand{\Beta}   {\mbox{B}}
+\newcommand{\Epsilon}{\mbox{E}}
+\newcommand{\Zeta}   {\mbox{Z}}
+\newcommand{\Eta}    {\mbox{H}}
+\newcommand{\Iota}   {\mbox{I}}
+\newcommand{\Kappa}  {\mbox{K}}
+\newcommand{\Mu}     {\mbox{M}}
+\newcommand{\Nu}     {\mbox{N}}
+\newcommand{\Omicron}{\mbox{O}}
+\newcommand{\omicron}{\mbox{o}}
+\newcommand{\Rho}    {\mbox{P}}
+\newcommand{\Tau}    {\mbox{T}}
+\newcommand{\Chi}    {\mbox{X}}
+
+%
+% "Blackboard bold" versions of the most common
+% field symbols for the Reals, Integers, etc.
+%
+\newcommand{\Naturals} {\mathbb{N}}
+\newcommand{\Integers} {\mathbb{Z}}
+\newcommand{\Reals}    {\mathbb{R}}
+\newcommand{\Rationals}{\mathbb{Q}}
+\newcommand{\Complexes}{\mathbb{C}}
+\newcommand{\Booleans} {\mathbb{B}}
+\newcommand{\Field}    {\mathbb{F}}
+
+% Vector space V
+\newcommand{\V}    {\mathbf{V}}
+% Vector space W 
+\newcommand{\W}    {\mathbf{W}}
+% Vector 0 
+\newcommand{\0}    {\mathbf{0}}
+
+% Vector T 
+\newcommand{\T}    {\mathbf{T}}
+
+% Vector N 
+\newcommand{\N}    {\mathbf{N}}
+
+% Vector R 
+\newcommand{\R}    {\mathbf{R}}
+
+
+\newenvironment{left-column}{\begin{minipage}[t]{0.4\textwidth}}{\end{minipage}}
+\newenvironment{right-column}{\hspace{0.1\textwidth}\begin{minipage}[t]{0.4\textwidth}}{\end{minipage}}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% CONFIGURATION 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Number equations by section 1.1, 1.2... rather than 1, 2, ...
+\numberwithin{equation}{section}
+
+% Reduce bullet size in enumerated lists
+\renewcommand{\labelitemi}{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+% Disable separation between list items
+\setlist{nolistsep}
+
+% Margin notes
+\setlength{\marginparsep}{1cm}
+
+% Fancy header configuration
+\setlength{\headheight}{20pt}
+\setlength{\headsep}{30pt}
+\pagestyle{fancy}
+
+\definecolor{shadecolor}{RGB}{240,240,240}
+\setlength{\FrameSep}{1cm}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% HEADER 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% Suppress the automatic date
+\date{} 
+
+% Generate the title and author
+\title{A small context mixing compressor}
+\author{Jason Linehan}
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT ABSTRACT 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+\maketitle
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT BODY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Explanation}
+
+This is a context-mixing compression algorithm. It is a mathematical machine
+made up of mathematical parts. Each part solves a particular problem,
+and together, the parts make the algorithm work. The layout and interaction
+between these parts is called the architecture of the program. To make 
+the architecture easier to see, each part has been broken into its own file.
+
+\subsection{How C programs work}
+As a convention, each part, let's call it a {\em module}, is represented by two 
+files. Suppose the module's name is {\tt foo}. Then the {\tt foo} module is 
+made up of {\tt foo.c}, and {\tt foo.h}. {\tt foo.c} is the C source code 
+for the {\tt foo} module. {\tt foo.h} is the header file for {\tt foo.c}.
+A header file defines the interface for the module. Symbols in {\tt foo.c} 
+(such as the names of functions) are invisible to other parts of the program,
+unless we make them available in a header file, and then include that header
+file with {\tt \#include "foo.h"} in another part of the program. We say that
+the different parts of the program are {\em linked}, using these header files.
+
+You can see other headers being {\tt \#included} at the top of most of 
+the files listed here. If the line looks like {\tt \#include <file.h>}, we
+are linking a library installed on the system. If it looks like 
+{\tt \#include "file.h"}, we are linking a file in our directory.
+
+Except for the three functions in {\tt main.c}, which represent the major
+actions of the program, that is: {\tt main()}, {\tt compress()}, and 
+{\tt decompress()}, every function is defined in one of these modules.
+A module does not have to expose everything in its header file. If there are 
+functions or data structures that it uses internally to accomplish its task, 
+these can be hidden from the parts of the program that do not need to know 
+about them. This is a design rule called the {\em principle of least knowledge}.
+
+\subsection{Getting help}
+If you see a function name whose source code does not appear in the listing, 
+such as {\tt getc()} on line {\tt 62}, it probably belongs to the C Standard
+Library, and is being linked in one of the header files at the top. On any UNIX 
+machine, including OS/X, you can type the command {\tt man {\em function}} 
+at the terminal, where {\tt {\em function}} is the name of the function, to 
+bring up a manual page for that function. You can do the same thing using the 
+name of the header files, e.g. {\tt man stdio.h}. These are available because all UNIX 
+derivatives are written in C, and these systems are in many ways a programming 
+environment for that language. Certain functions, for example {\tt printf()}, 
+are available both in the shell and in the C library, so you may need to 
+specify that you mean the C library version by typing {\tt 3} after the {\tt man}
+command, as in {\tt man 3 printf}. For a listing of all the different manual 
+levels, you can (what else?) run {\tt man man}.
+
+\subsection{Tracing the execution}
+Every C program begins execution in a function called {\tt main()}. Here, that
+function is found in the file {\tt main.c}. If you want to trace the execution
+of the program, it goes from the top of {\tt main()} to the bottom of 
+{\tt main()}. Simple, right?
+
+\subsection{Programming style conventions}
+
+In programmer-speak, a function which operates on a specific data structure
+is called a {\em method} for that data structure. In our world, we specify
+the data structure with {\tt struct name\_t}, where the {\tt \_t} means "type".
+This is purely a convention. All methods of this data structure will begin with 
+{\tt name\_} and the first argument will be a pointer to a data structure of 
+that type. For example, the arithmetic coder's data structure is 
+{\tt struct ac\_t}, and a method would be {\tt ac\_encode\_bit}.
+Except in very special cases, variables in {\tt ALL\_CAPS} represent constant
+values, variables in {\tt Title\_case} represent global values relative to a 
+given scope, and all other variables are {\tt lowercase}. Tradition from the
+old days of teletype is that each line is no more than 80 characters wide.
+This turned out to be a good idea in general, since people aren't good at 
+scanning left to right. Tabs are 8 spaces wide. There are those who wish it 
+were otherwise, but they are wrong to do so.
+
+
+
+\section{main.c}
+\begin{snugshade}
+This file contains the start of the program, {\tt main()}, and the two
+primary functions {\tt compress()} and {\tt decompress()}.
+{\tt main()} in particular is filled with tedious code to capture and
+arrange the arguments given to the program by the user, and plenty of 
+tedious filesystem code to resolve paths, create new files, or open old ones.
+The messy task of {\tt main()} is to get things set up for the compression or 
+decompression. The program could just
+as easily be read starting at {\tt compress()} or {\tt decompress()}.
+\end{snugshade}
+
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../main.c}
+\end{multicols}
+
+\pagebreak
+\section{coder.h}
+\begin{snugshade}
+This file contains the data structure and methods for the Arithmetic Coder,
+probably the single most crucial component of the compression. It is the task
+of the Arithmetic Coder to encode a series of predictions (probability values)
+about whether the next bit will be a 0 or a 1.
+\end{snugshade}
+
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\footnotesize,
+               framesep=2mm]{c}{../coder.h}
+\section{coder.c}
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../coder.c}
+\end{multicols}
+
+
+\pagebreak
+\section{mixer.h}
+\begin{snugshade}
+This file contains the data structure and methods for the neural network which
+mixes the predictions of different context models. A neural network is a means
+to minimize an error function by optimizing a set of weights.
+
+An extremely brief glance at what a neural network is and does:
+
+A neural network is a special kind of function. Given n binary inputs, the 
+neural network will give 1 binary output. Each of the n inputs is associated
+with one of n weights. The inputs, multiplied by their weights, are summed,
+and if the result of the sum is above a certain threshold, the output is 1.
+If it is below that threshold, the output is 0. In the real world, we need
+to be able to take the derivative of the output, so an activation function
+$K$ is chosen, typically a sigmoid function such as the logistic function,
+rather than using a discrete threshold.
+\begin{align*}
+        f(x_0,x_1,...,x_n) = K(\sum_{i=0}^n w_ix_i)
+\end{align*}
+
+The major feature of the neural network is that the weights $w_i$ are adaptive,
+that is, the algorithm can alter the weights to change the function, in a 
+process called learning. 
+
+Consider the output of the network as a prediction of the "right" answer,
+given the inputs $x_0,...,x_n$. If we obtain the actual answer, we can compare
+it with the output of the neural network, and compute some error function,
+typically the mean squared error (MSE).
+
+Then, the weights are updated, in order to minimize this error function.
+The method used to update the weights is an algorithm called backpropagation,
+which itself uses another technique called gradient descent.
+\end{snugshade}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\small,
+               framesep=2mm]{c}{../mixer.h}
+\section{mixer.c}
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../mixer.c}
+\end{multicols}
+
+\pagebreak
+\section{predictor.h}
+\begin{snugshade}
+This file contains the data structure and methods for the {\tt SMOOTH()} 
+function, which performs something called Secondary Symbol Estimation (SSE),
+which is an unpublished folkloristic procedure for refining a probability
+value.
+\end{snugshade}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\small,
+               framesep=2mm]{c}{../predictor.h}
+\section{predictor.c}
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../predictor.c}
+\end{multicols}
+
+\pagebreak
+\section{model.h}
+\begin{snugshade}
+This file contains the code for the {\tt MODEL()} function, which computes a
+probability based on recent bits. This is the statistical model of the input
+stream.
+
+The main action of the model is contained in the {\tt MODEL()} function, which
+controls how the various parts of the history and contexts are arranged to make
+predictions, and how those predictions are fed to the neural network. 
+
+The name of the function, {\tt MODEL}, illustrates an unfortunate situation
+familiar to programmers, as "model" is both a noun and a verb. So, is this
+function the model, or does this function do the modelling? The answer is
+that it controls the modelling, and so to other layers of the program, for
+all intents and purposes, it "is" the model, as information from the input
+stream goes in, and a prediction comes out.
+
+However the actual models are data structures, and in fact several different
+kinds of models can be combined and mixed by the {\tt MODEL} function to get 
+different results. For our purposes, only one kind of model is used, the 
+simplest kind, a simple stationary model ({\tt ssm\_t}).
+
+The operation of the SSM model is simple. It contains a large table of 
+probabilities, all initially set to 1/2. When a byte is being processed
+by the model, the previously-seen byte is considered to be the "current context",
+i.e. the context in which predictions are now being made about the incoming
+bits of the current byte. The previous byte, the "context", is used to retreive
+a probability in the table. 
+
+Since the context is just an integer value, call the value 'b'. We simply 
+select the b-th item in the table, and that item will represent the probability 
+of the next bit being a 1, if byte b is the current context. 
+
+When we see a new bit, we modify the probability stored in the b-th item
+of the table according to an update rule. It is this update rule that 
+determines how the model behaves statistically.
+Since this is a stationary model, we simply increment or decrement the
+probability according to what we see.
+
+Once we are done with the current byte, that byte becomes the new context,
+and a new probability value is looked up in the table, and the process
+continues.
+\end{snugshade}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\small,
+               framesep=2mm]{c}{../model.h}
+\section{model.c}
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../model.c}
+\end{multicols}
+
+\pagebreak
+\section{util.h}
+\begin{snugshade}
+Here we have a grab-bag of different items of widely varying importance.
+\end{snugshade}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\small,
+               framesep=2mm]{c}{../util.h}
+\section{util.c}
+\begin{multicols}{2}
+\inputminted[mathescape,
+               linenos,
+               firstnumber=last,
+               numbersep=5pt,
+               gobble=0,
+               frame=none,
+               fontsize=\tiny,
+               framesep=2mm]{c}{../util.c}
+\end{multicols}
+
+
+%\begin{minted}[mathescape,
+               %linenos,
+               %numbersep=5pt,
+               %gobble=2,
+               %frame=lines,
+               %escapeinside=$,
+               %framesep=2mm]{c}
+               %$\input{../main.c}$
+%\end{minted}
+
+
+
+
+
+
+\end{document}
