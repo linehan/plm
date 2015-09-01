@@ -1,4 +1,5 @@
-#define NAME "gypsy"  
+#define NAME      "gypsy"  
+#define EXTENSION "gy"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,6 +31,48 @@ int MODE;
  * FUNCTIONS 
  ******************************************************************************/
 
+int y=0;  // Last bit, 0 or 1, set by encoder
+
+// Global context set by Predictor and available to all models.
+int c0=1; // Last 0-7 bits of the partial byte with a leading 1 bit (1-255)
+uint32_t c4=0; // Last 4 whole bytes, packed.  Last byte is bits 0-7.
+int bpos=0; // bits in c0 (0 to 7)
+int pos;  // Number of input bytes in buf (not wrapped)
+
+int bufsize = MEM_MAX*8;
+int buf[MEM_MAX*8];
+int Last = 0;
+
+void update_stuff(int bit, int part, uint32_t context, int bitpos)
+{
+        // Update global context: pos, bpos, c0, c4, buf
+        c0+=c0+bit;
+        if (c0>=256) {
+                /*printf("(%d) update\n", bpos);*/
+                Last = buf[pos&(MEM*8-1)];
+                buf[pos++&(MEM*8-1)]=c0;
+                c4=(c4<<8)+c0-256;
+                c0=1;
+        }
+        bpos=(bpos+1)&7;
+
+        /*if (bpos != bitpos) {*/
+                /*printf("pos:%d bpos:%d\n", pos, bpos);*/
+                /*printf("pos:%d btps:%d\n", pos, bitpos);*/
+        /*}*/
+
+        if (c4 != context) {
+                printf("bpos:%d c4:"FMT_U32S"\n", bpos, VAL_U32(c4));
+                printf("bpos:%d cx:"FMT_U32S"\n", bpos, VAL_U32(context));
+        }
+
+        if (c0 != part) {
+                printf("pos:%d bpos:%d c0:"FMT_U32S"\n", pos, bpos, VAL_U32(c0));
+                printf("pos:%d bpos:%d pt:"FMT_U32S"\n", pos, bpos, VAL_U32(part));
+        }
+}
+
+
 /**
  * compress()
  * ``````````
@@ -49,7 +92,9 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
         int bit;
         uint32_t code;
         uint32_t word = 0;
-        uint8_t  part = 0;
+        uint8_t  part = 1; // start as 1
+        int count;
+        uint32_t preword = 0;
 
         /* For each byte in the file */
         for (i=0; i<src_size; i++) {
@@ -84,22 +129,27 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
                         }
 
                         /* Pass the actual bit and prediction to the encoder */
-                        ac_encode_bit(ac, p, bit);
+                        ac_encoder_add_bit(ac, p, bit);
 
-                        while ((code = ac_encode_flush(ac))!=UINT32_MAX) {
+                        while ((code=ac_encoder_try_get_byte(ac))!=UINT32_MAX) {
                                 /* Write any ready bytes to the archive */
                                 putc(code, dst);
                         }
 
+                        update_stuff(bit, part, word, 7-j);
+
                         /* Predict the next bit using the model */
-                        p = MODEL(word, part, bit, (j == 0));
+                        /*p = MODEL(word, part, bit, (7-j), (j == 0));*/
+                        p = SIMPLE(word, part, bit, bpos);
 
                         /* Smooth the prediction with SSE */
                         p = SMOOTH(p, word, part, bit);
+
+                        preword = word;
                 }
         }
 
-        ac_encode_finish(ac, dst);
+        ac_encoder_flush(ac, dst);
 }
 
 
@@ -120,10 +170,10 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
         int b;
         int p = 2048;
         int bit;
-        int byte;
-        int next_byte;
-        uint32_t word;
-        uint8_t part;
+        int byte=0;
+        int next_byte=0;
+        uint32_t word=0;
+        uint8_t part=1;
 
         /* For each byte of the eventual (decompressed) target */
         for (i=0; i<dst_size; i++) {
@@ -134,7 +184,7 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                 for (j=0; j<8; j++) {
 
                         /* Decode a bit */
-                        bit = ac_decode_bit(ac, p);
+                        bit = ac_decoder_get_bit(ac, p);
 
                         /* Build the byte by adding this bit */
                         byte = (byte << 1) | bit;
@@ -160,12 +210,14 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                                 part = (part << 1) | bit;
                         }
 
+                        update_stuff(bit, part, word, 0);
+
                         for (;;) {
                                 /* Get the next byte from the source */
                                 next_byte = getc(src);
 
                                 /* Try to add it to the encoder */
-                                if (!ac_decode_try_add_byte(ac, next_byte)) {
+                                if (!ac_decoder_try_add_byte(ac, next_byte)) {
                                         /* Push it back if unsuccessful */
                                         ungetc(next_byte, src);    
                                         break;
@@ -173,7 +225,8 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                         }
 
                         /* Predict the next bit using the model */
-                        p = MODEL(word, part, bit, (j == 7));
+                        /*p = MODEL(word, part, bit, j, (j == 7));*/
+                        p = SIMPLE(word, part, bit, bpos);
 
                         /* Smooth the prediction with SSE */
                         p = SMOOTH(p, word, part, bit);
@@ -238,7 +291,7 @@ int main(int argc, char** argv)
 
         if (MODE == COMPRESS) {
 
-                sprintf(target_name, "%s.zpaq", basename(strdup(source_path)));
+                sprintf(target_name, "%s."EXTENSION, basename(strdup(source_path)));
 
                 target_file = fopen(target_name, "wb+");
                 source_file = fopen(source_path, "rb");
@@ -342,6 +395,8 @@ int main(int argc, char** argv)
 
                 printf("%ld -> %ld\n", source_size, ftell(target_file));
         }
+
+        REPORT();
 
         log_close();
 

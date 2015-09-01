@@ -11,6 +11,8 @@
  * UTILITY/MATH FUNCTIONS 
  ******************************************************************************/
 
+uint8_t read_byte(FILE *file);
+uint32_t read_word(FILE *file);
 void ilog_init(void);
 int ilog(uint16_t x);
 int llog(uint32_t x);

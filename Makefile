@@ -48,6 +48,7 @@ HUG_SOURCES=main.c \
 	    coder.c \
 	    mixer.c \
 	    predictor.c \
+	    context.c \
 	    model.c \
 
 	
@@ -65,9 +66,9 @@ all: hug
 
 test: hug
 	./gypsy dat/csf.txt
-	./gypsy -d csf.txt.zpaq csf.out
+	./gypsy -d csf.txt.gy csf.out
 	diff csf.out dat/csf.txt 
-	rm csf.out csf.txt.zpaq
+	rm csf.out csf.txt.gy
 
 hug: $(HUG_SOURCES) asm
 	$(CPP_COMPILER) $(CC_FLAGS) $(HUG_SOURCES) $(ASM_OBJECTS) -o gypsy 

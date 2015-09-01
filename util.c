@@ -24,9 +24,29 @@ void *calloc_align(int boundary, size_t size)
 {
         char *mem;
 
-        mem = (char *)calloc(size, 1);
+        mem = (char *)calloc(boundary+size, 1);
         return (void *)(mem+boundary-(((long)mem)&(boundary-1)));
 }
+
+uint8_t read_byte(FILE *file)
+{
+        assert(file != NULL);
+
+        return (uint8_t)getc(file);
+}
+
+uint32_t read_word(FILE *file)
+{
+        uint32_t word = 0;
+
+        word = (word << 8) | read_byte(file) & 0xFF;
+        word = (word << 8) | read_byte(file) & 0xFF;
+        word = (word << 8) | read_byte(file) & 0xFF;
+        word = (word << 8) | read_byte(file) & 0xFF;
+
+        return word;
+}
+
 
 /**
  * print_status()

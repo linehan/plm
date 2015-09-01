@@ -1,222 +1,187 @@
 #include <stdlib.h>
-#include <assert.h>
 #include <stdio.h>
-#include "predictor.h"
+#include <stdint.h>
+#include <limits.h>
+#include <assert.h>
 #include "coder.h"
 
 /******************************************************************************
  * ARITHMETIC CODER 
  ******************************************************************************/
-#include <stdint.h>
-#include <limits.h>
 
 extern int MODE;
 
-/* 
- * APPEND_BYTE()
- * `````````````
- * "Append" a byte to an existing value. 
- *
- * @target: Value to append to. Should be at least 16-bits.
- * @byte  : Byte to be appended. Will be wrapped if @byte>255.
- * Return : @target appended with @byte. @target is not modified.
- *
- * NOTE
- * Here is an explanation of the bitwise operations.
- *
- *      0. Shift the target left by 8 bits, 
- *         to make room for the new byte.
- *
- *      1. Ensure that the byte is actually
- *         a byte, by doing a BITWISE AND
- *         with the value 0xFF == 255 == 2^8, 
- *         the maximum value a byte can have.
- *
- *         This acts as a fast binary modulus,
- *         ensuring the byte value is between
- *         0-255, and will fit within 8 bits.
- *
- *      2. Use BITWISE OR to combine the left
- *         shifted target with the wrapped byte
- *         to obtain the final output.
- *
- *         Instead of BITWISE OR, addition could
- *         also be used, as the two are the same
- *         thing here since the 8 low-order bits
- *         are all 0. 
- */
-#define APPEND_BYTE(target, byte)       (((target)<<8) | (byte & 0xFF))
+#define PR_BITS 12    /* (0-4095) */
+#define PR_MAX  4095  /* Maximum probability value */
 
 /* 
  * NOTE
- * We want to use our probability value to choose the midpoint
- * of the new interval. 
+ * To adaptively choose the midpoint of our interval, we 
+ * multiply the current interval by a fractional value 
+ * (p/PR_MAX), where p is some probability (0-PR_MAX).
  *
- * To do this, we simply multiply the current interval by
- * a fractional value (p/4096), where p is the probability
- * ranging from 0-4096.
+ * We are working in fixed-point arithmetic, so to get
+ * the integral part, we do:
  *
- *      interval * (p/4096)
- *
- * This gives us the integral part.
+ *      interval * (p/PR_MAX)
  *
  * To get the fractional part, we compute the remainder of
- * the interval mod 4096, and again apply
+ * the interval mod PR_MAX, and do: 
  *
- *      remainder * (p/4096)
+ *      remainder * (p/PR_MAX)
  *
- * Then we add them, and this is the new midpoint.
- *
- * ---------------------------------------------------------------
- *
- * Recall that ">> 12" is arithmetic right-shift by 12 bits,
- * which is equivalent to division by 2^12 = 4096.
- *
- * Recall that "& 4095" is equivalent to calculating the remainder 
- * of the interval mod 4096.
+ * Then we add the integral and fractional parts, and this 
+ * is the new midpoint.
  *
  * ---------------------------------------------------------------
- * This works because of an interesting property of modular 
- * arithmetic:
+ */
+#define MIDPOINT(lo, hi, prob) \
+        (lo + ((hi - lo)>>PR_BITS)*prob + ((hi - lo & PR_MAX)*prob>>PR_BITS))
+/*
+ * ---------------------------------------------------------------
+ *
+ * Recall that ">> PR_BITS" is arithmetic right-shift by PR_BITS bits,
+ * which is equivalent to division by 2^PR_BITS = PR_MAX.
+ *
+ * Recall that "& PR_MAX" is equivalent to calculating the remainder 
+ * of the interval mod PR_MAX.
+ *
+ * This works because:
  *      
  *      x mod 2^n == x & 2^(n-1)
  *
  * This only works for integer powers of 2, because powers of two 
  * have the unique property of having only one bit set to '1' in 
  * their (unsigned) binary expansion.
- *
- * This is probably true in any base, but obviously as '&' is
- * a bitwise operation, we only care about base-2.
  */
-#define MIDPOINT(lo, hi, prob) \
-        (lo + ((hi - lo)>>12)*prob + ((hi - lo & 4095)*prob>>12))
 
+/******************************************************************************
+ * FUNCTIONS 
+ ******************************************************************************/
 
 /**
- * encoder_init()
- * ``````````````
+ * ac_init()
+ * `````````
  * Initialize the encoder structure.
  *
- * @enc  : Reference to encoder structure.
+ * @ac   : Reference to encoder structure.
  * @file : Output file.
  * Return: Nothing
  */
-void ac_init(struct ac_t *e, FILE *file)
+void ac_init(struct ac_t *ac, FILE *file)
 {
         int i;
 
-        e->x0      = 0;
-        e->x1      = 0xffffffff;
-        e->word    = 0;
+        ac->lo   = 0x00000000;
+        ac->hi   = 0xFFFFFFFF;
+        ac->word = 0x00000000;
 
         if (level > 0 && MODE == DECOMPRESS) {
-                for (i=0; i<4; i++) {
-                        e->word = APPEND_BYTE(e->word, getc(file));
-                }
+                /* Read in a word (getc returns a byte) */
+                ac->word = (ac->word << 8) | (getc(file) & 0xFF);
+                ac->word = (ac->word << 8) | (getc(file) & 0xFF);
+                ac->word = (ac->word << 8) | (getc(file) & 0xFF);
+                ac->word = (ac->word << 8) | (getc(file) & 0xFF);
         }
 }
 
 /**
- * ac_encode_flush()
- * `````````````````
+ * ac_encoder_add_bit()
+ * ````````````````````
+ * Encode a bit.
+ *
+ * @ac   : Reference to encoder structure.
+ * @p    : A prediction (probability) from (0-4096) 
+ * @bit  : Bit to encode.
+ * Return: The bit decoded (1 or 0) (should match @bit)
+ */
+int ac_encoder_add_bit(struct ac_t *ac, int p, int bit)
+{
+        /* Midpoint of current range */
+        uint32_t mid; 
+
+        mid = MIDPOINT(ac->lo, ac->hi, p);
+
+        log_msg(LOG_AC, "%g\n", (double)p/(double)4096);
+
+        assert(mid >= ac->lo && mid < ac->hi); 
+        
+        /* Adjust the endpoints depending on the bit value y */
+        if (bit == 0) {
+                ac->lo = mid + 1;
+        } else {
+                ac->hi = mid;
+        }
+
+        return bit;
+}
+
+
+/**
+ * ac_encoder_try_get_byte()
+ * `````````````````````````
  * Get any ready bytes from the encoder.
  *
- * @e    : Reference to encoder structure.
+ * @ac   : Reference to arithmetic coder structure.
  * Return: Encoded byte if available, UINT32_MAX if none available.
  */
-uint32_t ac_encode_flush(struct ac_t *e)
+uint32_t ac_encoder_try_get_byte(struct ac_t *ac)
 {
-        uint32_t ret;
+        uint32_t byte = 0x00000000;
 
-        if (((e->x0 ^ e->x1) & 0xFF000000) == 0) {
-                /* 
-                 * Get leading 8 bits in low-order position 
-                 * by shifting right 24 bits.
-                 */
-                ret = e->x1 >> 24;
+        /* The endpoints are equal on their high-order byte */
+        if (((ac->lo ^ ac->hi) & 0xFF000000) == 0) {
 
-                e->x0 = (e->x0 << 8);
-                e->x1 = (e->x1 << 8) + 255;
+                /* Gets high-order byte */
+                byte = (ac->hi >> 24);
 
-                return ret;
+                ac->lo = (ac->lo << 8);
+                ac->hi = (ac->hi << 8) + 255;
+
+                return byte;
         } else {
                 return UINT32_MAX;
         }
 }
 
+
 /** 
- * ac_encode_finish()
+ * ac_encoder_flush()
  * ``````````````````
  * Flush first unequal byte of range
  *
- * @enc  : Reference to encoder structure.
- * Return: First unequal byte of range if available, else UINT32_MAX
+ * @ac   : Reference to arithmetic coder structure.
+ * Return: Nothing
  */
-void ac_encode_finish(struct ac_t *e, FILE *file) 
+void ac_encoder_flush(struct ac_t *ac, FILE *file) 
 {
-        if (MODE == COMPRESS && level>0) {
-                /* Flush first unequal byte of range */
-                putc(e->x0 >> 24, file);
+        if (MODE == COMPRESS && level > 0) {
+                /* Write high-order byte to file */
+                putc((ac->lo >> 24), file);
         }
 }
 
 
 /**
- * ac_encode_bit()
- * ```````````````
- * Encode a bit.
- *
- * @e    : Reference to encoder structure.
- * @p    : A prediction (probability) from (0-4096) TODO:unsigned? 
- * @bit  : Bit to encode.
- * Return: The bit decoded (1 or 0) (should match @bit)
- */
-int ac_encode_bit(struct ac_t *e, int p, int bit)
-{
-        /* Midpoint of current range */
-        uint32_t xmid; 
-
-        /* What is this doing? */
-        p += (p < 2048) ? 1 : 0; 
-
-        /* See NOTE at top */
-        xmid = MIDPOINT(e->x0, e->x1, p);
-
-        log_msg(LOG_AC, "%g\n", (double)p/(double)4096);
-
-        assert(xmid >= e->x0 && xmid < e->x1); 
-        
-        /* Adjust the endpoints depending on the bit value y */
-        if (bit == 0) {
-                e->x0 = xmid+1;
-        } else {
-                e->x1 = xmid;
-        }
-
-        return bit;
-
-        /* Whether we are ready to write output */
-        /*return (((e->x0 ^ e->x1) & 0xFF000000) == 0) ? 1 : 0;*/
-}
-
-
-/**
- * ac_decode_try_add_byte()
- * ````````````````````````
+ * ac_decoder_try_add_byte()
+ * `````````````````````````
  * Try to add a new input character to the encoder.
  *
- * @e    : Reference to encoder structure.
+ * @ac   : Reference to encoder structure.
  * @byte : New byte from the compressed file.
  * Return: 1 if @byte appended, otherwise 0.
  */
-int ac_decode_try_add_byte(struct ac_t *e, int byte)
+int ac_decoder_try_add_byte(struct ac_t *ac, uint8_t byte)
 {
-        if (((e->x0 ^ e->x1) & 0xFF000000) == 0) {
+        /* The endpoints are equal on their high-order byte */
+        if (((ac->lo ^ ac->hi) & 0xFF000000) == 0) {
 
-                e->x0 = (e->x0 << 8);
-                e->x1 = (e->x1 << 8) + 255;
+                /* Shift endpoints and separate low-order bytes */
+                ac->lo = (ac->lo << 8) | 0x00000000;
+                ac->hi = (ac->hi << 8) | 0x000000FF;
 
-                e->word = APPEND_BYTE(e->word, byte);
+                /* Shift+Append the new byte to the word */
+                ac->word = (ac->word << 8) | (byte & 0xFF);
 
                 return 1;
         } else {
@@ -224,36 +189,33 @@ int ac_decode_try_add_byte(struct ac_t *e, int byte)
         }
 }
 
+
 /**
- * ac_decode_bit()
- * ```````````````
+ * ac_decoder_get_bit()
+ * ````````````````````
  * Decode a bit.
  *
- * @e    : Reference to encoder structure.
+ * @ac   : Reference to encoder structure.
  * @p    : A prediction (probability) from (0-4096) TODO:unsigned? 
  * Return: The bit decoded (1 or 0)
  */
-int ac_decode_bit(struct ac_t *e, int p)
+int ac_decoder_get_bit(struct ac_t *ac, int p)
 {
         /* Midpoint of current range */
-        uint32_t xmid; 
-        int bit;
+        uint32_t mid; 
+        int      bit;
 
-        /* What is this doing? */
-        p += (p < 2048) ? 1 : 0; 
+        mid = MIDPOINT(ac->lo, ac->hi, p);
 
-        /* See NOTE at top */
-        xmid = MIDPOINT(e->x0, e->x1, p);
-
-        assert(xmid >= e->x0 && xmid < e->x1);
+        assert(mid >= ac->lo && mid < ac->hi);
         
-        bit = (e->word <= xmid) ? 1 : 0;
+        bit = (ac->word <= mid) ? 1 : 0;
         
         /* Adjust the endpoints depending on the bit value y */
         if (bit == 0) {
-                e->x0 = xmid+1;
+                ac->lo = mid + 1;
         } else {
-                e->x1 = xmid;
+                ac->hi = mid;
         }
 
         return bit;

@@ -139,7 +139,7 @@ void nn_init(struct nn_t *nn, int n, int m, int s, int w)
         if (nn->S > 1) {
                 nn->nn_ptr = calloc(sizeof(struct nn_t), 1);
 
-                /* They can operate in a chain, so we recurse here. */
+                 /*They can operate in a chain, so we recurse here. */
                 nn_init(nn->nn_ptr, nn->S, 1, 1, 0x7FFF);
         }
 }
@@ -167,6 +167,7 @@ void nn_train(struct nn_t *nn, int bit)
                 err = ((bit<<12) - nn->pr[i])*7;
 
                 assert(err >= -32768 && err < 32768);
+                /*printf("err:%d\n", err);*/
                 
                 /* ASM */
                 train(&nn->tx[0], &nn->wx[nn->ctx[i] * nn->N], nn->nx, err);
@@ -227,6 +228,16 @@ void nn_set(struct nn_t *nn, int context, int range)
         nn->base += range;
 }
 
+void nn_print(struct nn_t *nn)
+{
+        int i;
+        for (i=0; i<nn->nx; i++) {
+                printf("tx[%d]:%d\n", i, nn->tx[i]);
+        }
+        for (i=0; i<nn->nx; i++) {
+                printf("wx[%d]:%d\n", i, nn->wx[i]);
+        }
+}
 
 /**
  * nn_predict()

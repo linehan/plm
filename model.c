@@ -1,4 +1,5 @@
 #include "model.h"
+#include "context.h"
 
 /******************************************************************************
  * SMALL STATIONARY CONTEXT MAP 
@@ -26,11 +27,16 @@
  */
 #define UPDATE_RATE 2
 
+struct ssm_item_t {
+        uint16_t prob;
+        uint8_t used;
+};
+
 struct ssm_t {
-        uint16_t *table;     /* Table of bit history */
+        struct ssm_item_t *table;     /* Table of bit history */
         int       context;   /* Current context */ 
         int       size;      /* Size of table */ 
-        uint16_t *current;   /* Current history item */
+        struct ssm_item_t *current;   /* Current history item */
 };
 
 
@@ -47,7 +53,7 @@ void ssm_init(struct ssm_t *map, int bytes)
 {
         int i;
 
-        map->table   = calloc(bytes/2*sizeof(uint16_t), 1);
+        map->table   = calloc(bytes/2*sizeof(struct ssm_item_t), 1);
         map->size    = bytes/2;
         map->context = 0;
 
@@ -57,7 +63,8 @@ void ssm_init(struct ssm_t *map, int bytes)
                  * A 16-bit probability value can range 
                  * from 0-65536, so 1/2 is 65536/2 = 32768.
                  */
-                map->table[i] = 32768;
+                map->table[i].prob = 32768;
+                map->table[i].used = 0;
         }
 
         map->current = &map->table[0];
@@ -82,6 +89,7 @@ void ssm_set(struct ssm_t *map, uint32_t context)
          */
         map->context = context*256 & map->size-256;
         map->current = &map->table[map->context];
+        map->current->used += 1;
 }
 
 /*
@@ -126,7 +134,7 @@ void ssm_update(struct ssm_t *map, uint8_t last_byte, int last_bit)
          */
         uint16_t prob;
 
-        prob = *map->current;
+        prob = map->current->prob;
                 
         if (last_bit == 0) {
                 prob = prob - (prob >> UPDATE_RATE);
@@ -134,7 +142,7 @@ void ssm_update(struct ssm_t *map, uint8_t last_byte, int last_bit)
                 prob = prob + ((UINT16_MAX - prob) >> UPDATE_RATE);
         }
 
-        *map->current = prob;
+        map->current->prob = prob;
 }
 
 /**
@@ -154,17 +162,55 @@ int ssm_predict(struct ssm_t *map)
          * have to scale down by 4 bits in order to get into that
          * range (0-4096).
          */
-        return stretch(*map->current >> 4);
+        return stretch(map->current->prob >> 4);
 }
 
 
-/******************************************************************************
- * MODEL 
- ******************************************************************************/
+static struct ssm_t   cm;
+static int matchc = 0;
+static int bit_counter = 0;
 
-int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int do_update) 
+void ssm_report(struct ssm_t *map)
 {
-        static struct ssm_t   cm;
+        int i;
+        int c=0;
+        int c1=0;
+        int c2=0;
+        int c3=0;
+        int c4=0;
+        int t=0;
+
+        for (i=0; i<map->size; i++) {
+                if (map->table[i].used > 0) {
+                        c++;
+                }
+                if (map->table[i].used == 1) {
+                        c1++;
+                }
+                if (map->table[i].used == 2) {
+                        c2++;
+                }
+                if (map->table[i].used == 3) {
+                        c3++;
+                }
+                if (map->table[i].used > 3) {
+                        c4++;
+                }
+                t += map->table[i].used;
+        }
+        printf("Used %d distinct contexts out of %d, %d once, %d twice, %d three times, %d four+ times, total of %d\n", c, map->size, c1, c2, c3, c4, t);
+        printf("Used big matches %d times\n", matchc);
+}
+
+
+void REPORT(void)
+{
+        ssm_report(&cm);
+}
+
+
+int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int last_byte_bits, int do_update) 
+{
         static struct nn_t    mixer;
         static uint32_t       context_hash;
         static int            first = 1;
@@ -195,13 +241,23 @@ int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int do_update)
         nn_train(&mixer, last_bit);
         nn_input(&mixer, 256);
 
+        bit_counter++;
+
+        /*if (MATCH(&mixer, context, last_byte, last_bit, last_byte_bits) > 400) {*/
+                /*if (matchc == 0) {*/
+                        /*printf("started using at bit_counter:%d\n", bit_counter);*/
+                /*}*/
+                /*matchc++;*/
+                /*nn_set(&mixer, 0, 8);*/
+                /*return nn_predict(&mixer, last_bit);*/
+        /*}*/
+
         /* 
          * When we have no bits in buf->last_byte, we
          * are on a new byte boundary, so we should 
          * update the order 0-11 context hashes.
          */
         if (do_update == 1) {
-
                 context_hash = context_hash*257 + (context & 0x000000FF) + 1;
                 ssm_set(&cm, context_hash);
         }
@@ -221,6 +277,103 @@ int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int do_update)
         nn_set(&mixer, byte1, 256);
         nn_set(&mixer, byte2, 256);
   
+        return nn_predict(&mixer, last_bit);
+}
+
+int count2 = 0;
+
+int SIMPLE(uint32_t context, uint8_t last_byte, int last_bit, int count) 
+{
+        static int            first = 1;
+        static struct nsm_t   cm;
+        static struct nn_t    mixer;
+        static uint32_t       hist[16];
+
+        uint8_t  byte0;
+        uint8_t  byte1;
+        uint8_t  byte2;
+        int      order;
+        int      i;
+
+        /* 
+         * Initialize the context models 
+         * and the mixer 
+         */
+        if (first) {
+                nsm_init(&cm, MEM*32, 16);
+
+                /* 
+                 * 512  inputs
+                 * 1040 neural networks
+                 * 4    selectable inputs
+                 * 128  default weight 
+                 */
+                nn_init(&mixer, 512, 1040, 4, 128);
+
+                first = 0;
+        }
+
+        nn_train(&mixer, last_bit);
+        nn_input(&mixer, 256);
+
+        /* 
+         * When we have no bits in buf->last_byte, we
+         * are on a new byte boundary, so we should 
+         * update the order 0-11 context hashes.
+         */
+        /*printf("total:%d\n", count2++);*/
+        /*printf("count:%d\n", count);*/
+        if (count == 0) {
+                /*printf("cx:"FMT_U32S"\n", VAL_U32(context));*/
+
+                /* Update the history */
+                for (i=15; i>0; --i) {
+                        /*hist[i] = hist[i-1]*257 + (context & 0x000000FF) + 1;*/
+                        hist[i] = hist[i-1]*257 + (context & 255) + 1;
+                        /*printf("(%d) cxt[%d]:%d\n", context, i, hist[i]);*/
+                        /*cxt[i]  = cxt[i-1]*257+   (c4      & 255)+1;*/
+                }
+
+                /* Add updated history to the nsm */
+                for (i=0; i<7; i++) {
+                        nsm_set(&cm, hist[i]);
+                }
+                nsm_set(&cm, hist[8]);
+                nsm_set(&cm, hist[14]);
+        }
+
+        order = nsm_mix(&cm, &mixer, context, last_byte, count, last_bit);
+
+        if (order > 7) { 
+                order = 7;
+        }
+
+        byte0 = (context & 0x000000FF);
+        byte1 = (context & 0x0000FF00) >> 8; 
+        byte2 = (context & 0x00FF0000) >> 16;
+
+        /*int b1;*/
+        /*int b2;*/
+        /*int b3;*/
+        /*int b4;*/
+          /*printf("b1:"FMT_U32S"\n", VAL_U32(byte0+8));*/
+          /*printf("b2:"FMT_U32S"\n", VAL_U32(last_byte));*/
+          /*printf("b3:"FMT_U32S"\n", VAL_U32(order+8*(context>>5&7)+64*(byte0==byte1)));*/
+          /*printf("b4:"FMT_U32S"\n", VAL_U32(byte1));*/
+
+
+        nn_set(&mixer, byte0+8, 264);
+        nn_set(&mixer, last_byte,   256);
+
+        if (byte0 == byte1) {
+                nn_set(&mixer, order+8*(context>>5&7)+64, 256);
+        } else {
+                nn_set(&mixer, order+8*(context>>5&7),    256);
+        }
+
+        nn_set(&mixer, byte1, 256);
+  
+        /* Return the mixer's final prediction. */
         return nn_predict(&mixer, last_bit);
 }
 
