@@ -1,5 +1,6 @@
 #define NAME      "gypsy"  
 #define EXTENSION "gy"
+#define NO_LOGGING_PLEASE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,50 +28,69 @@ int level = DEFAULT_OPTION;
 /* COMPRESS OR DECOMPRESS (defined in util.h) */
 int MODE;
 
+/* BUFFER and state-keeping structure. */
+struct io_t {
+        int      bit;            /* Last bit */
+        int      byte;           /* Last byte */
+        int      part;           /* Currently-assembling byte */
+        int      bit_count;      /* Number of bits seen */
+        int      byte_count;     /* Number of bytes seen */
+        int      part_count;     /* Number of bits in partially-read byte */
+        uint32_t word;           /* Last 4 bytes */
+        int      pr;             /* Probability (0-4096) of next bit being 1 */
+        int      buf_size;       /* Size of buffer (memory) */
+        uint8_t  buf[MEM_MAX*8]; /* Buffer (record of past bytes) */
+        /* for logging */
+        uint32_t avg_bit_raw[8];
+        uint32_t avg_bit_smooth[8];
+        uint32_t err_bit_raw[8];
+        uint32_t err_bit_smooth[8];
+        uint32_t err_byte_raw_tmp;
+        uint32_t avg_byte_raw_tmp;
+        uint32_t err_byte_smooth_tmp;
+        uint32_t avg_byte_smooth_tmp;
+        uint32_t err_byte_raw;
+        uint32_t err_byte_smooth;
+        uint32_t avg_byte_raw;
+        uint32_t avg_byte_smooth;
+        /*int      avg_byte_raw;*/
+        /*int      err_byte_raw;*/
+        /*int      avg_byte_smooth;*/
+        /*int      err_byte_smooth;*/
+
+        /* TODO: This buffer makes the static allocation and exe size of
+         *       the program absolutely huge!
+         */
+};
+
+struct io_t io = {
+        0,
+        0,
+        1,              /* Start with trailing 1 (see below) */
+        0,
+        0,
+        0,
+        0,
+        2048,           /* Range is 0-4096, so 2048 is pr=1/2 */
+        MEM_MAX*8,
+        {0},
+        {0},
+        {0},
+        {0},
+        {0},
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+};
+
 /******************************************************************************
  * FUNCTIONS 
  ******************************************************************************/
-
-int y=0;  // Last bit, 0 or 1, set by encoder
-
-// Global context set by Predictor and available to all models.
-int c0=1; // Last 0-7 bits of the partial byte with a leading 1 bit (1-255)
-uint32_t c4=0; // Last 4 whole bytes, packed.  Last byte is bits 0-7.
-int bpos=0; // bits in c0 (0 to 7)
-int pos;  // Number of input bytes in buf (not wrapped)
-
-int bufsize = MEM_MAX*8;
-int buf[MEM_MAX*8];
-int Last = 0;
-
-void update_stuff(int bit, int part, uint32_t context, int bitpos)
-{
-        // Update global context: pos, bpos, c0, c4, buf
-        c0+=c0+bit;
-        if (c0>=256) {
-                /*printf("(%d) update\n", bpos);*/
-                Last = buf[pos&(MEM*8-1)];
-                buf[pos++&(MEM*8-1)]=c0;
-                c4=(c4<<8)+c0-256;
-                c0=1;
-        }
-        bpos=(bpos+1)&7;
-
-        /*if (bpos != bitpos) {*/
-                /*printf("pos:%d bpos:%d\n", pos, bpos);*/
-                /*printf("pos:%d btps:%d\n", pos, bitpos);*/
-        /*}*/
-
-        if (c4 != context) {
-                printf("bpos:%d c4:"FMT_U32S"\n", bpos, VAL_U32(c4));
-                printf("bpos:%d cx:"FMT_U32S"\n", bpos, VAL_U32(context));
-        }
-
-        if (c0 != part) {
-                printf("pos:%d bpos:%d c0:"FMT_U32S"\n", pos, bpos, VAL_U32(c0));
-                printf("pos:%d bpos:%d pt:"FMT_U32S"\n", pos, bpos, VAL_U32(part));
-        }
-}
 
 
 /**
@@ -87,66 +107,144 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
 {
         int i;
         int j;
-        int p    = 2048; /* Prob is (0-4096), so start this at 1/2 = 2048 */
-        int byte = 0;
-        int bit;
         uint32_t code;
-        uint32_t word = 0;
-        uint8_t  part = 1; // start as 1
-        int count;
-        uint32_t preword = 0;
 
         /* For each byte in the file */
         for (i=0; i<src_size; i++) {
 
                 /* Read a byte from the source stream */
-                byte = getc(src);
+                io.byte = getc(src);
 
                 /* For each bit in the byte */
                 for (j=7; j>=0; j--) {
 
-                        bit = (byte >> j) & 1;
+                        io.bit = (io.byte >> j) & 1;
 
-                        if (j == 0) {
+                        /* 
+                         * Add the bit to the partially-read
+                         * byte.
+                         */
+                        io.part = (io.part << 1) | io.bit;
+
+                        /*
+                         * Increment the bit position in the
+                         * current byte.
+                         */
+                        io.part_count++;
+
+                        /*
+                         * Increment the total bit counter.
+                         */
+                        io.bit_count++;
+
+                        if (io.part > 256) {
                                 /* 
                                  * Add the full byte (sans trailing '1')
                                  * to the word history 
                                  */
-                                word = (word << 8) + byte;
+                                io.word = (io.word << 8) + io.byte;
+
+                                /*
+                                 * Add the full byte (sans trailing '1') 
+                                 * to the byte history buffer.
+                                 */
+                                io.buf[io.byte_count & io.buf_size-1] = io.byte;
+
+                                /*
+                                 * Increment the byte counter, which
+                                 * doubles as the index into io.buf.
+                                 */
+                                io.byte_count++;
+
                                 /* 
                                  * Use a trailing '1' bit here to ensure
                                  * that consecutive zeroes are hashed to
                                  * something different as this '1' gets
                                  * left-shifted.
+                                 *
+                                 * Also, this allows us to detect when
+                                 * to enter this branch, since we keep
+                                 * shifting io.part left, and that 1 will
+                                 * eventually cause it to become greater
+                                 * than 256.
+                                 *
+                                 * TODO: Is this necessary?
                                  */
-                                part = 1;
-                        } else {
-                                /* 
-                                 * Add the bit to the partially-read
-                                 * byte.
+                                io.part = 1;
+
+                                /*
+                                 * Reset the bit position in the
+                                 * current byte to 0.
                                  */
-                                part = (part << 1) | bit;
+                                io.part_count = 0;
+
+
+                                /*
+                                 *
+                                 * output the averages
+                                 *
+                                 */
+                                #ifndef NO_LOGGING_PLEASE
+                                int k;
+                                for (k=0; k<8; k++) {
+                                        log_msg(LOG_AVG_PRAW[k], "%d %g\n", io.byte_count, (float)io.avg_bit_raw[k]/(float)io.byte_count);
+                                        log_msg(LOG_AVG_PSMOOTH[k], "%d %g\n", io.byte_count, (float)io.avg_bit_smooth[k]/(float)io.byte_count);
+                                        log_msg(LOG_ERR_PSMOOTH[k], "%d %g\n", io.byte_count, (float)io.err_bit_smooth[k]/(float)io.byte_count);
+                                        log_msg(LOG_ERR_PRAW[k], "%d %g\n", io.byte_count, (float)io.err_bit_raw[k]/(float)io.byte_count);
+                                }
+
+                                io.err_byte_smooth += io.err_byte_smooth_tmp;
+                                io.err_byte_raw    += io.err_byte_raw_tmp;
+                                
+                                log_msg(LOG_ERR_BYTE_PSMOOTH, "%d %g\n", io.byte_count, (float)io.err_byte_smooth/(float)io.byte_count);
+                                log_msg(LOG_ERR_BYTE_PRAW, "%d %g\n", io.byte_count, (float)io.err_byte_raw/(float)io.byte_count);
+
+                                io.avg_byte_smooth += abs((io.avg_byte_smooth_tmp-2048));
+                                io.avg_byte_raw    += abs((io.avg_byte_raw_tmp-2048));
+                                
+                                log_msg(LOG_AVG_BYTE_PSMOOTH, "%d %g\n", io.byte_count, (float)io.avg_byte_smooth/(float)io.byte_count);
+                                log_msg(LOG_AVG_BYTE_PRAW, "%d %g\n", io.byte_count, (float)io.avg_byte_raw/(float)io.byte_count);
+
+                                #endif
                         }
 
                         /* Pass the actual bit and prediction to the encoder */
-                        ac_encoder_add_bit(ac, p, bit);
+                        ac_encoder_add_bit(ac, io.pr, io.bit);
 
                         while ((code=ac_encoder_try_get_byte(ac))!=UINT32_MAX) {
                                 /* Write any ready bytes to the archive */
                                 putc(code, dst);
                         }
 
-                        update_stuff(bit, part, word, 7-j);
-
                         /* Predict the next bit using the model */
-                        /*p = MODEL(word, part, bit, (7-j), (j == 0));*/
-                        p = SIMPLE(word, part, bit, bpos);
+                        io.pr = SIMPLE(io.word, io.part, io.bit, io.part_count);
+
+                        #ifndef NO_LOGGING_PLEASE
+                        if (io.byte_count % 2 != 0) {
+                                log_msg(LOG_PRAW[7-j], "%d %d\n", io.bit_count, io.pr);
+                                if (io.bit == 0 && io.pr >= 2048) {
+                                        log_msg(LOG_LOSS_PRAW[7-j], "%d %d\n", io.bit_count, io.pr);
+                                } else {
+                                        log_msg(LOG_WIN_PRAW[7-j], "%d %d\n", io.bit_count, io.pr);
+                                }
+                        }
+                        #endif
 
                         /* Smooth the prediction with SSE */
-                        p = SMOOTH(p, word, part, bit);
+                        io.pr = SMOOTH(io.pr, io.word, io.part, io.bit);
 
-                        preword = word;
+                        #ifndef NO_LOGGING_PLEASE
+                        if (io.byte_count % 2 != 0) {
+                                log_msg(LOG_PSMOOTH[7-j], "%d %d\n", io.bit_count, io.pr);
+                                if (io.bit == 0 && io.pr >= 2048) {
+                                        log_msg(LOG_LOSS_PSMOOTH[7-j], "%d %d\n", io.bit_count, io.pr);
+                                } else {
+                                        log_msg(LOG_WIN_PSMOOTH[7-j], "%d %d\n", io.bit_count, io.pr);
+                                }
+                        }
+                        #endif
                 }
+
         }
 
         ac_encoder_flush(ac, dst);
@@ -167,50 +265,81 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
 {
         int i;
         int j;
-        int b;
-        int p = 2048;
-        int bit;
-        int byte=0;
-        int next_byte=0;
-        uint32_t word=0;
-        uint8_t part=1;
+        int next_byte;
 
         /* For each byte of the eventual (decompressed) target */
         for (i=0; i<dst_size; i++) {
-
-                byte = 0;
 
                 /* For each bit of the byte */
                 for (j=0; j<8; j++) {
 
                         /* Decode a bit */
-                        bit = ac_decoder_get_bit(ac, p);
+                        io.bit = ac_decoder_get_bit(ac, io.pr);
 
-                        /* Build the byte by adding this bit */
-                        byte = (byte << 1) | bit;
+                        /* 
+                         * Add the bit to the partially-read
+                         * byte.
+                         */
+                        io.part = (io.part << 1) | io.bit;
 
-                        if (j == 7) {
+                        /* 
+                         * Keep building up the "real" byte,
+                         * without the leading 1.
+                         */
+                        io.byte = (io.part & 0x000000FF);
+
+                        /*
+                         * Increment the bit position in the
+                         * current byte.
+                         */
+                        io.part_count++;
+
+                        /*
+                         * Increment the total bit counter.
+                         */
+                        io.bit_count++;
+
+                        if (io.part > 256) {
                                 /* 
                                  * Add the full byte (sans trailing '1')
                                  * to the word history 
                                  */
-                                word = (word << 8) + byte;
+                                io.word = (io.word << 8) + io.byte;
+
+                                /*
+                                 * Add the full byte (sans trailing '1') 
+                                 * to the byte history buffer.
+                                 */
+                                io.buf[io.byte_count & io.buf_size-1] = io.byte;
+
+                                /*
+                                 * Increment the byte counter, which
+                                 * doubles as the index into io.buf.
+                                 */
+                                io.byte_count++;
+
                                 /* 
                                  * Use a trailing '1' bit here to ensure
                                  * that consecutive zeroes are hashed to
                                  * something different as this '1' gets
                                  * left-shifted.
+                                 *
+                                 * Also, this allows us to detect when
+                                 * to enter this branch, since we keep
+                                 * shifting io.part left, and that 1 will
+                                 * eventually cause it to become greater
+                                 * than 256.
+                                 *
+                                 * TODO: Is this necessary?
                                  */
-                                part = 1;
-                        } else {
-                                /* 
-                                 * Add the bit to the partially-read
-                                 * byte.
-                                 */
-                                part = (part << 1) | bit;
-                        }
+                                io.part = 1;
 
-                        update_stuff(bit, part, word, 0);
+                                /*
+                                 * Reset the bit position in the
+                                 * current byte to 0.
+                                 */
+                                io.part_count = 0;
+                        }
 
                         for (;;) {
                                 /* Get the next byte from the source */
@@ -225,16 +354,45 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                         }
 
                         /* Predict the next bit using the model */
-                        /*p = MODEL(word, part, bit, j, (j == 7));*/
-                        p = SIMPLE(word, part, bit, bpos);
+                        io.pr = SIMPLE(io.word, io.part, io.bit, io.part_count);
 
                         /* Smooth the prediction with SSE */
-                        p = SMOOTH(p, word, part, bit);
+                        io.pr = SMOOTH(io.pr, io.word, io.part, io.bit);
                 }
 
                 /* Write the decoded byte to the destination. */
-                putc(byte, dst); 
+                putc(io.byte, dst); 
         }
+}
+
+FILE *stream_to_file(FILE *stream)
+{
+        FILE *file;
+        int   ch;
+        
+        /* Will be destroyed when program ends or file closed */
+        file = tmpfile();
+
+        /* Copy the stream to the temp file */
+        while ((ch = fgetc(stream)) != EOF) {
+                fputc(ch, file);
+        }
+
+        rewind(file);
+
+        return file;
+}
+
+
+void print_usage_and_exit(char *bad_part)
+{
+        if (bad_part != NULL) {
+                fprintf(stderr, "I don't know '%s'.\n", bad_part);
+        }
+
+        fprintf(stderr, "USAGE: "NAME" -c|-d [<input>] [-o <output>]\nMEM_MAX:%d\n",MEM_MAX);
+
+        exit(0);
 }
 
 /******************************************************************************
@@ -261,49 +419,198 @@ int main(int argc, char** argv)
         long  target_size;
         long  start;
 
-        if (argc < 2) {
-                printf("MEM_MAX:%d\n\n", MEM_MAX);
-                printf("Usage: "NAME" [-d] <filename>\n");
-                exit(1);
+        if (argc == 1) {
+                print_usage_and_exit(NULL);
         }
 
-        if (!strcmp(argv[1], "-d")) {
+        if (!strcmp(argv[1], "-c")) {
+                MODE = COMPRESS;
+        } else if (!strcmp(argv[1], "-d")) {
+                MODE = DECOMPRESS;
+        } else {
+                print_usage_and_exit(NULL);
+        }
 
-                if (argc <= 3) {
-                        printf("USAGE:"NAME" -d <input> <output>\n");
-                        exit(1);
+        switch (argc) {
+        case 2:
+                source_file = stream_to_file(stdin);   
+                source_path = "STDIN";
+                target_path = "STDOUT";
+                target_file = stdout;
+                break;
+        case 3:
+                if (!strcmp(argv[2], "-o")) {
+                        print_usage_and_exit(NULL);
+                } else if (argv[2][0] == '-') {
+                        print_usage_and_exit(argv[2]);
+                } else {
+                        source_path = argv[2];
+                        target_file = stdout;
+                        target_path = "STDOUT"; 
+                }
+                break;
+        case 4:
+                if (!strcmp(argv[2], "-o")) {
+                        if (argv[3][0] == '-') {
+                                print_usage_and_exit(argv[3]);
+                        } else {
+                                source_path = "STDIN";
+                                source_file = stream_to_file(stdin);
+                                target_path = argv[3];
+                        }
+                } else {
+                        print_usage_and_exit(NULL);
+                }
+                break;
+        case 5:
+                if (!strcmp(argv[2], "-o")) {
+                        print_usage_and_exit(NULL);
+                } else if (argv[2][0] == '-') {
+                        print_usage_and_exit(argv[2]);
+                } else {
+                        source_path = argv[2];
                 }
 
-                MODE = DECOMPRESS;
+                if (!strcmp(argv[3], "-o")) {
+                        if (argv[4][0] == '-') {
+                                print_usage_and_exit(argv[4]);
+                        } else {
+                                target_path = argv[4];
+                        }
+                } else {
+                        print_usage_and_exit(NULL);
+                }
 
-                source_path = argv[2];
-                target_path = argv[3];
-
-        } else {
-                MODE = COMPRESS;
-
-                source_path = argv[1];
+                break;
+        default:
+                print_usage_and_exit(NULL);
+                break;
         }
 
-        ilog_init(); // TODO: fix this shit!
+        /*if (!strcmp(argv[1], "-d")) {*/
+
+                /*MODE = DECOMPRESS;*/
+
+                /*switch (argc) {*/
+                /*case 1:*/
+                        /*source_file = stream_to_file(stdin);   */
+                        /*source_path = "STDIN";*/
+                        /*break;*/
+                /*case 2:*/
+                        /*if (!strcmp(argv[2], "-o")) {*/
+                                /*print_usage_and_exit(NULL);*/
+                        /*} else if (argv[2][0] == '-') {*/
+                                /*print_usage_and_exit(argv[2]);*/
+                        /*} else {*/
+                                /*target_path = argv[2]; */
+                        /*}*/
+                        /*break;*/
+                /*case 3:*/
+                        /*if (!strcmp(argv[2], "-o")) {*/
+                                /*if (argv[3][0] == '-') {*/
+                                        /*print_usage_and_exit(argv[3]);*/
+                                /*} else {*/
+                                        /*target_path = argv[3];*/
+                                /*}*/
+                        /*} else {*/
+                                /*print_usage_and_exit(NULL);*/
+                        /*}*/
+                        /*break;*/
+                /*case 4:*/
+                        /*if (!strcmp(argv[2], "-o")) {*/
+                                /*print_usage_and_exit(NULL);*/
+                        /*} else if (argv[2][0] == '-') {*/
+                                /*print_usage_and_exit(argv[2]);*/
+                                /*exit(0);*/
+                        /*} else {*/
+                                /*source_path = argv[2];*/
+                        /*}*/
+
+                        /*if (!strcmp(argv[3], "-o")) {*/
+                                /*if (argv[4][0] == '-') {*/
+                                        /*printf("I don't know '%s'.\n", argv[4]);*/
+                                        /*printf("USAGE: "NAME" -c [<input>] [-o <output]\n");*/
+                                        /*exit(0);*/
+                                /*} else {*/
+                                        /*target_path = argv[4];*/
+                                /*}*/
+                        /*}*/
+                        /*break;*/
+                /*default:*/
+                        /*printf("USAGE: "NAME" -c [<input>] [-o <output]\n");*/
+                        /*exit(0);*/
+                        /*break;*/
+                /*}*/
+        /*}*/
+
+
+        /*if (!strcmp(argv[1], "-d")) {*/
+
+                /*if (argc <= 3) {*/
+                        /*printf("USAGE:"NAME" -d <input> <output>\n");*/
+                        /*exit(1);*/
+                /*}*/
+
+                /*MODE = DECOMPRESS;*/
+
+                /*source_path = argv[2];*/
+                /*target_path = argv[3];*/
+
+        /*} else {*/
+                /*MODE = COMPRESS;*/
+
+                /*source_path = argv[1];*/
+        /*}*/
+
+        ilog_init();    // TODO: fix this shit!
         stretch_init(); // TODO: fix this shit!
         log_init();
 
+        /*if (target_file == NULL) {*/
+                /*target_file = fopen(target_path, "rb");*/
+                /*if ((target_file = fopen(target_path, "rb"))) {*/
+                        /*printf("File exists.\n");*/
+                        /*fclose(target_file);*/
+                        /*return 1;*/
+                /*}*/
+        /*}*/
+        
+        if (source_file == NULL) {
+                source_file = fopen(source_path, "rb");
+        }
+
+        if (target_file == NULL) {
+                /*
+                 * If an output file already exists, then we will 
+                 * compare the result of this decompression with 
+                 * its contents.
+                 */
+                if ((target_file = fopen(target_path, "rb"))) {
+                        fprintf(stderr, "File exists.\n");
+                        fclose(target_file);
+                        return 1;
+                }
+
+                /* Create a new file */
+                if (!(target_file = fopen(target_path, "wb"))) {
+                        fprintf(stderr, "Could not open file.\n");
+                        exit(1);
+                }
+        }
+
+        if (!target_file) { 
+                fprintf(stderr, "Error creating %s\n", target_path);
+                exit(1);
+        }
+        if (!source_file) { 
+                fprintf(stderr, "Error opening %s\n", source_path);
+                exit(1);
+        }
+
+
         if (MODE == COMPRESS) {
 
-                sprintf(target_name, "%s."EXTENSION, basename(strdup(source_path)));
-
-                target_file = fopen(target_name, "wb+");
-                source_file = fopen(source_path, "rb");
-
-                if (!target_file) { 
-                        printf("Error creating %s\n", target_name);
-                        exit(1);
-                }
-                if (!source_file) { 
-                        printf("Error opening %s\n", source_path);
-                        exit(1);
-                }
+                /*sprintf(target_name, "%s."EXTENSION, basename(strdup(source_path)));*/
 
                 source_size = file_length(source_file);
 
@@ -317,18 +624,18 @@ int main(int argc, char** argv)
                         source_size
                 );
 
-                printf("Creating archive %s...\n", target_name);
+                /*printf("Creating archive %s...\n", target_name);*/
         }
 
         if (MODE == DECOMPRESS) {
 
-                source_file = fopen(source_path, "rb+");
-                source_size = file_length(source_file);
+                /*source_file = fopen(source_path, "rb+");*/
+                /*source_size = file_length(source_file);*/
 
-                if (!source_file) { 
-                        printf("Error opening %s\n", source_path);
-                        exit(1);
-                }
+                /*if (!source_file) { */
+                        /*printf("Error opening %s\n", source_path);*/
+                        /*exit(1);*/
+                /*}*/
 
                 /* 
                  * Read header and get options
@@ -339,10 +646,10 @@ int main(int argc, char** argv)
                         &target_size
                 );
 
-                printf("compressor:%s\nlevel:%d\ntarget-size:%ld\n", compressor, level, target_size);
+                /*fprintf(stderr, "compressor:%s\nlevel:%d\ntarget-size:%ld\n", compressor, level, target_size);*/
 
                 if (strcmp(compressor, NAME) != 0) {
-                        printf("%s: not a "NAME" file\n", source_path);
+                        fprintf(stderr, "%s: not a "NAME" file\n", source_path);
                         exit(1);
                 }
                 
@@ -350,26 +657,26 @@ int main(int argc, char** argv)
                         level = DEFAULT_OPTION;
                 }
 
-                printf("Inflating %s at level %d\n", 
-                        source_path, 
-                        level
-                );
+                /*fprintf(stderr, "Inflating %s at level %d\n", */
+                        /*source_path, */
+                        /*level*/
+                /*);*/
         }
 
         if (MODE == COMPRESS) {
         
                 ac_init(&ac, target_file);
 
-                if (!(source_file = fopen(source_path, "rb"))) {
-                        perror(source_path);
-                        exit(1);
-                }
+                /*if (!(source_file = fopen(source_path, "rb"))) {*/
+                        /*perror(source_path);*/
+                        /*exit(1);*/
+                /*}*/
 
                 start = ftell(target_file);
 
                 compress(target_file, source_file, source_size, &ac);
 
-                printf("%ld -> %ld\n", source_size, ftell(target_file)-start);
+                /*fprintf(stderr, "%ld -> %ld\n", source_size, ftell(target_file)-start);*/
 
         } else {
                 ac_init(&ac, source_file);
@@ -379,24 +686,28 @@ int main(int argc, char** argv)
                  * compare the result of this decompression with 
                  * its contents.
                  */
-                if ((target_file = fopen(target_path, "rb"))) {
-                        printf("File exists.\n");
-                        fclose(target_file);
-                        return 1;
-                }
+                /*if ((target_file = fopen(target_path, "rb"))) {*/
+                        /*printf("File exists.\n");*/
+                        /*fclose(target_file);*/
+                        /*return 1;*/
+                /*}*/
 
-                /* Create a new file */
-                if (!(target_file = fopen(target_path, "wb"))) {
-                        printf("Could not open file.\n");
-                        exit(1);
-                }
+                /*[> Create a new file <]*/
+                /*if (!(target_file = fopen(target_path, "wb"))) {*/
+                        /*printf("Could not open file.\n");*/
+                        /*exit(1);*/
+                /*}*/
 
                 decompress(target_file, source_file, target_size, &ac);
 
-                printf("%ld -> %ld\n", source_size, ftell(target_file));
+                /*fprintf(stderr, "%ld -> %ld\n", source_size, ftell(target_file));*/
         }
 
-        REPORT();
+        if (!strcmp(target_path, "STDOUT")) {
+                fflush(stdout);
+        }
+
+        /*REPORT();*/
 
         log_close();
 

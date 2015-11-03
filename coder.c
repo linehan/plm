@@ -102,7 +102,7 @@ int ac_encoder_add_bit(struct ac_t *ac, int p, int bit)
 
         mid = MIDPOINT(ac->lo, ac->hi, p);
 
-        log_msg(LOG_AC, "%g\n", (double)p/(double)4096);
+        /*log_msg(LOG_AC, "%g\n", (double)p/(double)4096);*/
 
         assert(mid >= ac->lo && mid < ac->hi); 
         

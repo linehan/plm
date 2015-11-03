@@ -76,5 +76,8 @@ hug: $(HUG_SOURCES) asm
 asm: $(ASM_SOURCES)
 	$(ASM_COMPILER) $(ASM_SOURCES) -f elf -m amd64
 
+install:
+	cp gypsy /usr/local/bin
+
 clean:
 	rm -f $(HUG_OBJECTS) $(ASM_OBJECTS) gypsy gmon.out 

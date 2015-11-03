@@ -1,0 +1,1 @@
+plot "prob.smooth.avg.bit0" with lines, "prob.smooth.avg.bit1" with lines, "prob.smooth.avg.bit2" with lines, "prob.smooth.avg.bit3" with lines, "prob.smooth.avg.bit4" with lines, "prob.smooth.avg.bit5" with lines, "prob.smooth.avg.bit6" with lines, "prob.smooth.avg.bit7" with lines

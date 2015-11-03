@@ -77,5 +77,25 @@ extern FILE *LOG_AC;
 extern FILE *LOG_NN;
 extern FILE *LOG_SSE;
 extern FILE *LOG_MODEL;
+//extern FILE *LOG_PRAW;
+//extern FILE *LOG_PSMOOTH;
+extern FILE *LOG_PRAW[8];
+extern FILE *LOG_PSMOOTH[8];
+extern FILE *LOG_AVG_PRAW[8];
+extern FILE *LOG_AVG_PSMOOTH[8];
+
+extern FILE *LOG_ERR_PRAW[8];
+extern FILE *LOG_ERR_PSMOOTH[8];
+
+extern FILE *LOG_AVG_BYTE_PRAW;
+extern FILE *LOG_AVG_BYTE_PSMOOTH;
+extern FILE *LOG_ERR_BYTE_PRAW;
+extern FILE *LOG_ERR_BYTE_PSMOOTH;
+
+extern FILE *LOG_WIN_PRAW[8];
+extern FILE *LOG_WIN_PSMOOTH[8];
+
+extern FILE *LOG_LOSS_PRAW[8];
+extern FILE *LOG_LOSS_PSMOOTH[8];
 
 #endif

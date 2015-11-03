@@ -1,0 +1,7 @@
+-Try compressing book1 from Calgary corpus, and decompressing.
+
+        There is a bad character that vim reads as '^@', probably
+        a newline or EOF symbol. I think it must be causing the
+        compressor to decide it's finished, when in fact it isn't. 
+
+        just grep it for 'xxxiv' 

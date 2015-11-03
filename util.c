@@ -240,20 +240,87 @@ int stretch(int p)
 }
 
 
-FILE *LOG_AC;
-FILE *LOG_NN;
-FILE *LOG_SSE;
-FILE *LOG_MODEL;
+/*int LOG_INTERVAL = 10;*/
 
-int log_interval = 10;
-int logi = 0;
+FILE *LOG_AC = NULL;
+FILE *LOG_NN = NULL;
+FILE *LOG_SSE = NULL;
+FILE *LOG_MODEL = NULL;
+/*FILE *LOG_PRAW = NULL;*/
+/*FILE *LOG_PSMOOTH = NULL;*/
+
+FILE *LOG_PRAW[8]    = {0};
+FILE *LOG_PSMOOTH[8] = {0};
+
+FILE *LOG_WIN_PRAW[8]    = {0};
+FILE *LOG_WIN_PSMOOTH[8] = {0};
+
+FILE *LOG_LOSS_PRAW[8]    = {0};
+FILE *LOG_LOSS_PSMOOTH[8] = {0};
+
+FILE *LOG_AVG_PRAW[8] = {0};
+FILE *LOG_AVG_PSMOOTH[8] = {0};
+
+FILE *LOG_ERR_PRAW[8] = {0};
+FILE *LOG_ERR_PSMOOTH[8] = {0};
+
+FILE *LOG_AVG_BYTE_PRAW;
+FILE *LOG_AVG_BYTE_PSMOOTH;
+FILE *LOG_ERR_BYTE_PRAW;
+FILE *LOG_ERR_BYTE_PSMOOTH;
+
+
+char filename_praw[4096];
+char filename_psmooth[4096];
+char filename_avg_psmooth[4096];
+char filename_avg_praw[4096];
+char filename_err_psmooth[4096];
+char filename_err_praw[4096];
+char filename_win_praw[4096];
+char filename_loss_praw[4096];
+char filename_win_psmooth[4096];
+char filename_loss_psmooth[4096];
 
 void log_init(void)
 {
-        LOG_AC    = fopen("./log/ac.log", "w+");
-        LOG_NN    = fopen("./log/nn.log", "w+");
-        LOG_SSE   = fopen("./log/sse.log", "w+");
-        LOG_MODEL = fopen("./log/model.log", "w+");
+        LOG_AC      = fopen("./log/ac.log", "w+");
+        LOG_NN      = fopen("./log/nn.log", "w+");
+        LOG_SSE     = fopen("./log/sse.log", "w+");
+        LOG_AVG_BYTE_PSMOOTH = fopen("./log/prob.avg.smooth.byte", "w+");
+        LOG_ERR_BYTE_PSMOOTH = fopen("./log/prob.err.smooth.byte", "w+");
+        LOG_AVG_BYTE_PRAW = fopen("./log/prob.avg.raw.byte", "w+");
+        LOG_ERR_BYTE_PRAW = fopen("./log/prob.err.raw.byte", "w+");
+        /*LOG_MODEL = fopen("./log/model.log", "w+");*/
+        /*LOG_PRAW    = fopen("./log/prob.raw.log", "w+");*/
+        /*LOG_PSMOOTH = fopen("./log/prob.smooth.log", "w+");*/
+
+        int i;
+        
+        for (i=0; i<8; i++) {
+                snprintf(filename_praw, 4096, "./log/prob.raw.bit%d", i); 
+                snprintf(filename_psmooth, 4096, "./log/prob.smooth.bit%d", i); 
+                snprintf(filename_avg_psmooth, 4096, "./log/prob.smooth.avg.bit%d", i); 
+                snprintf(filename_err_psmooth, 4096, "./log/prob.smooth.err.bit%d", i); 
+                snprintf(filename_avg_praw, 4096, "./log/prob.smooth.avg.bit%d", i); 
+                snprintf(filename_err_praw, 4096, "./log/prob.smooth.err.bit%d", i); 
+                snprintf(filename_win_praw, 4096, "./log/prob.raw.win.bit%d", i); 
+                snprintf(filename_win_psmooth, 4096, "./log/prob.smooth.win.bit%d", i); 
+                snprintf(filename_loss_praw, 4096, "./log/prob.raw.loss.bit%d", i); 
+                snprintf(filename_loss_psmooth, 4096, "./log/prob.smooth.loss.bit%d", i); 
+
+                LOG_PRAW[i]    = fopen(filename_praw, "w+");
+                LOG_PSMOOTH[i] = fopen(filename_psmooth, "w+");
+                LOG_AVG_PSMOOTH[i] = fopen(filename_avg_psmooth, "w+");
+                LOG_ERR_PSMOOTH[i] = fopen(filename_err_psmooth, "w+");
+                LOG_AVG_PRAW[i] = fopen(filename_avg_praw, "w+");
+                LOG_ERR_PRAW[i] = fopen(filename_err_praw, "w+");
+
+                LOG_WIN_PRAW[i] = fopen(filename_win_praw, "w+");
+                LOG_WIN_PSMOOTH[i] = fopen(filename_win_psmooth, "w+");
+                
+                LOG_LOSS_PRAW[i] = fopen(filename_loss_praw, "w+");
+                LOG_LOSS_PSMOOTH[i] = fopen(filename_loss_psmooth, "w+");
+        }
 }
 
 void log_close(void)
@@ -267,15 +334,62 @@ void log_close(void)
         if (LOG_SSE != NULL) {
                 fclose(LOG_SSE);
         }
+        if (LOG_AVG_BYTE_PRAW != NULL) {
+                fclose(LOG_AVG_BYTE_PRAW);
+        }
+        if (LOG_AVG_BYTE_PSMOOTH != NULL) {
+                fclose(LOG_AVG_BYTE_PSMOOTH);
+        }
+        if (LOG_ERR_BYTE_PRAW != NULL) {
+                fclose(LOG_ERR_BYTE_PRAW);
+        }
+        if (LOG_ERR_BYTE_PSMOOTH != NULL) {
+                fclose(LOG_ERR_BYTE_PSMOOTH);
+        }
+
+        int i;
+        
+        for (i=0; i<8; i++) {
+                if (LOG_PRAW[i] != NULL) {
+                        fclose(LOG_PRAW[i]);
+                }    
+                if (LOG_PSMOOTH[i] != NULL) {
+                        fclose(LOG_PSMOOTH[i]);
+                }    
+                if (LOG_AVG_PSMOOTH[i] != NULL) {
+                        fclose(LOG_AVG_PSMOOTH[i]);
+                }    
+                if (LOG_AVG_PRAW[i] != NULL) {
+                        fclose(LOG_AVG_PRAW[i]);
+                }    
+                if (LOG_ERR_PSMOOTH[i] != NULL) {
+                        fclose(LOG_ERR_PSMOOTH[i]);
+                }    
+                if (LOG_ERR_PRAW[i] != NULL) {
+                        fclose(LOG_ERR_PRAW[i]);
+                }    
+                if (LOG_WIN_PRAW[i] != NULL) {
+                        fclose(LOG_WIN_PRAW[i]);
+                }    
+                if (LOG_LOSS_PRAW[i] != NULL) {
+                        fclose(LOG_LOSS_PRAW[i]);
+                }    
+                if (LOG_WIN_PSMOOTH[i] != NULL) {
+                        fclose(LOG_WIN_PSMOOTH[i]);
+                }    
+                if (LOG_LOSS_PSMOOTH[i] != NULL) {
+                        fclose(LOG_LOSS_PSMOOTH[i]);
+                }    
+        }
 }
 
 void log_msg(FILE *file, const char *fmt, ...)
 {
-        if (logi++ > 10) {
-                logi = 0;
-        } else {
-                return;
-        }
+        /*if (logi++ > 10) {*/
+                /*logi = 0;*/
+        /*} else {*/
+                /*return;*/
+        /*}*/
 
         va_list ap;
 
@@ -283,6 +397,7 @@ void log_msg(FILE *file, const char *fmt, ...)
                 va_start(ap, fmt); 
                 vfprintf(file, fmt, ap);
                 va_end(ap);
+                fflush(file);
         }
 }
 

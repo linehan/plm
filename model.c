@@ -243,15 +243,6 @@ int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int last_byte_bits,
 
         bit_counter++;
 
-        /*if (MATCH(&mixer, context, last_byte, last_bit, last_byte_bits) > 400) {*/
-                /*if (matchc == 0) {*/
-                        /*printf("started using at bit_counter:%d\n", bit_counter);*/
-                /*}*/
-                /*matchc++;*/
-                /*nn_set(&mixer, 0, 8);*/
-                /*return nn_predict(&mixer, last_bit);*/
-        /*}*/
-
         /* 
          * When we have no bits in buf->last_byte, we
          * are on a new byte boundary, so we should 
@@ -279,8 +270,6 @@ int MODEL(uint32_t context, uint8_t last_byte, int last_bit, int last_byte_bits,
   
         return nn_predict(&mixer, last_bit);
 }
-
-int count2 = 0;
 
 int SIMPLE(uint32_t context, uint8_t last_byte, int last_bit, int count) 
 {
@@ -321,23 +310,17 @@ int SIMPLE(uint32_t context, uint8_t last_byte, int last_bit, int count)
          * are on a new byte boundary, so we should 
          * update the order 0-11 context hashes.
          */
-        /*printf("total:%d\n", count2++);*/
-        /*printf("count:%d\n", count);*/
         if (count == 0) {
-                /*printf("cx:"FMT_U32S"\n", VAL_U32(context));*/
-
                 /* Update the history */
                 for (i=15; i>0; --i) {
-                        /*hist[i] = hist[i-1]*257 + (context & 0x000000FF) + 1;*/
                         hist[i] = hist[i-1]*257 + (context & 255) + 1;
-                        /*printf("(%d) cxt[%d]:%d\n", context, i, hist[i]);*/
-                        /*cxt[i]  = cxt[i-1]*257+   (c4      & 255)+1;*/
                 }
 
                 /* Add updated history to the nsm */
                 for (i=0; i<7; i++) {
                         nsm_set(&cm, hist[i]);
                 }
+
                 nsm_set(&cm, hist[8]);
                 nsm_set(&cm, hist[14]);
         }
@@ -350,17 +333,6 @@ int SIMPLE(uint32_t context, uint8_t last_byte, int last_bit, int count)
 
         byte0 = (context & 0x000000FF);
         byte1 = (context & 0x0000FF00) >> 8; 
-        byte2 = (context & 0x00FF0000) >> 16;
-
-        /*int b1;*/
-        /*int b2;*/
-        /*int b3;*/
-        /*int b4;*/
-          /*printf("b1:"FMT_U32S"\n", VAL_U32(byte0+8));*/
-          /*printf("b2:"FMT_U32S"\n", VAL_U32(last_byte));*/
-          /*printf("b3:"FMT_U32S"\n", VAL_U32(order+8*(context>>5&7)+64*(byte0==byte1)));*/
-          /*printf("b4:"FMT_U32S"\n", VAL_U32(byte1));*/
-
 
         nn_set(&mixer, byte0+8, 264);
         nn_set(&mixer, last_byte,   256);

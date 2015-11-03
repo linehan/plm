@@ -188,8 +188,6 @@ int apm_adjust(int pr, uint32_t cx, uint8_t part, int bit)
         hash1 = part ^ h2(cx&0x000000FF, cx&0x0000FF00>>8);
         hash2 = part ^ h3(cx&0x000000FF, cx&0x0000FF00>>8, cx&0x00FF0000>>16);
 
-        /*printf("raw:%d\n", pr);*/
-
         /*
          * There are 2 APM stages in series:
          *
@@ -203,8 +201,6 @@ int apm_adjust(int pr, uint32_t cx, uint8_t part, int bit)
         pr4 = apm_prob(&A4, pr, hash2 & 0xFFFF);
 
         pr = (pr2 + pr3*2 + pr4+2) >> 2;
-
-        /*printf("pr:%d\n", pr);*/
 
         return pr;
 }
