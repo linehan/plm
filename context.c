@@ -138,6 +138,10 @@ static const uint8_t State_table[256][4] = {
 
 #define nex(state,sel) State_table[state][sel]
 
+
+int State_count[255] = {0};
+
+
 /******************************************************************************
  * State map 
  * A StateMap maps a nonstationary counter state to a probability.
@@ -185,12 +189,28 @@ int statemap_predict(struct statemap_t *sm, int context, int bit)
 
         sm->table[sm->context] += (bit<<16)-sm->table[sm->context]+128 >> 8;
 
+        State_count[sm->context] += 1;
+
         sm->context = context;
         
         return sm->table[sm->context] >> 4;
 }
 
+void print_statemap_counts(void)
+{
+        int i;
+        FILE *file;
 
+        file = fopen("statemap_counts.log", "w");
+        if (file) {
+                for (i=1; i<255; i++) {
+                        fprintf(file, "%d %d\n", i, State_count[i]);
+                }
+                fflush(file);
+                fclose(file);
+        }
+
+}
 
 
 // Predict to mixer m from bit history state s, using sm to map s to
@@ -304,10 +324,44 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
  *       THE DATA STRUCTURE, IMPACTING THE CACHE 
  *       AND HARMING PERFORMANCE
  */
+/* LATER NOTE (11 June 2018):
+ *      You must view this as a bucket. 
+ *
+ *      Each bucket is 64-bytes (512 bits) in size.
+ *      It contains a 1-byte LRU queue modeled as above, with
+ *      each nibble being the index of the slot in the bucket
+ *      which was LRU.
+ *
+ *      Then there are 7 slots. Each slot contains a 2-byte (16-bit) checksum
+ *      and an array of 7 bytes serving as a bit history. 
+ *
+ *      Each slot is indexed by the last 0-2 bits of context (i.e. a 3-bit
+ *      value, and 2^3 = 8). 
+ *
+ *              So we could alternatively write it as
+ *
+ *                      struct hash_bucket_t {
+ *                              uint8_t queue;
+ *                              struct {
+ *                                      uint16_t checksum;
+ *                                      uint8_t  history[7];
+ *                              } slot[7];
+ *                      }
+ *
+ *              and this would be more clear. Obviously the result
+ *              is the same in memory.
+ *
+ *      The buckets are indexed by the context ending after 0, 3, and
+ *      5 bits of the current context.
+ *
+ *      Thus each byte modeled results in 3 main memory accesses per
+ *      context, and all other accesses are to cache, since the bucket
+ *      will be placed in the cache.
+ */
 struct nsm_hash_item_t {
         uint8_t  queue;
-        uint16_t checksum[7];
         uint8_t  history[7][7];
+        uint16_t checksum[7];
 };
 
 
@@ -459,12 +513,13 @@ void nsm_init(struct nsm_t *map, int mem, int count)
         /* 
          * mem>>6 == mem/2^6 == mem/64 
          * This is the number of buckets we will have
-         * (each bucket is 64 bytes)
+         * (each bucket is 64 bytes = 512 bits)
          */
         int i;
 
         map->num_contexts = count;
         map->table    = calloc_align(64, (mem>>6)*sizeof(struct nsm_hash_item_t));
+        /*map->table    = calloc(1, (mem>>6)*sizeof(struct nsm_hash_item_t));*/
         map->size     = (mem>>6);
         map->statemap = calloc(1, map->num_contexts*sizeof(struct statemap_t));
 
@@ -486,6 +541,8 @@ void nsm_init(struct nsm_t *map, int mem, int count)
                 map->arr[i] = map->cur[i] = &map->table[0].history[0][0];
                 map->run[i] = map->arr[i] + 3;
         }
+
+        Context_count = 0;
 }
 
 
@@ -515,8 +572,9 @@ void nsm_set(struct nsm_t *map, uint32_t cx)
         /*printf("i:%d got:%d set:%d\n", i, savecx, cx * 123456791 + i);*/
   
         map->context[i] = cx * 123456791 + i;
-}
 
+        Context_count++;
+}
 
 uint8_t *nsm_select(struct nsm_t *map, int i, int jump)
 {

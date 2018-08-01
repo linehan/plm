@@ -8,6 +8,8 @@
  * NONSTATIONARY MAP
  ******************************************************************************/
 
+int Context_count;
+
 struct nsm_t {
         int num_contexts;
         int next_context;
@@ -47,6 +49,7 @@ int      nsm_predict (struct nsm_t *map, int i, uint8_t last_byte, int last_byte
 int      nsm_mix     (struct nsm_t *map, struct nn_t *mixer, uint32_t ctx, uint8_t last_byte, int last_byte_bits, int last_bit);
 
 
+void print_statemap_counts(void);
 
 #endif
 

@@ -1,6 +1,6 @@
-#define NAME      "gypsy"  
-#define EXTENSION "gy"
-#define NO_LOGGING_PLEASE 1
+#define NAME      "hug"  
+#define EXTENSION "hug"
+// #define NO_LOGGING_PLEASE  
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,6 +17,7 @@
 #include "coder.h"
 #include "predictor.h"
 #include "model.h"
+#include "context.h"
 
 /******************************************************************************
  * GLOBAL STATE 
@@ -709,7 +710,10 @@ int main(int argc, char** argv)
 
         /*REPORT();*/
 
+        print_statemap_counts();
         log_close();
+
+        printf("Context_count:%d\n", Context_count);
 
         return 0;
 }

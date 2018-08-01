@@ -1,7 +1,6 @@
 #########################
 # Configure build      
 #########################
-
 CPP_COMPILER=gcc
 ASM_COMPILER=yasm
 
@@ -53,8 +52,6 @@ HUG_SOURCES=main.c \
 
 	
 HUG_OBJECTS=$(HUG_SOURCES:.c=.o)
-
-
 ASM_SOURCES=asm/paq7asm-x86_64.asm
 ASM_OBJECTS=$(ASM_SOURCES:.asm=.o)
 
@@ -64,20 +61,20 @@ ASM_OBJECTS=$(ASM_SOURCES:.asm=.o)
 
 all: hug 
 
-test: hug
-	./gypsy dat/csf.txt
-	./gypsy -d csf.txt.gy csf.out
+test: hug 
+	./hug dat/csf.txt
+	./hug -d csf.txt.hug csf.out
 	diff csf.out dat/csf.txt 
-	rm csf.out csf.txt.gy
+	rm csf.out csf.txt.hug
 
 hug: $(HUG_SOURCES) asm
-	$(CPP_COMPILER) $(CC_FLAGS) $(HUG_SOURCES) $(ASM_OBJECTS) -o gypsy 
+	$(CPP_COMPILER) $(CC_FLAGS) $(HUG_SOURCES) $(ASM_OBJECTS) -o hug 
 
 asm: $(ASM_SOURCES)
 	$(ASM_COMPILER) $(ASM_SOURCES) -f elf -m amd64
 
 install:
-	cp gypsy /usr/local/bin
+	cp hug /usr/local/bin
 
 clean:
-	rm -f $(HUG_OBJECTS) $(ASM_OBJECTS) gypsy gmon.out 
+	rm -f $(HUG_OBJECTS) $(ASM_OBJECTS) hug gmon.out 
