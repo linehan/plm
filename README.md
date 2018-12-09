@@ -10,6 +10,6 @@ In their paper first describing the NCD, Cilibrasi and Vitanyi outlined a group 
 They also proposed a number of popular compression algorithms to be used, however did not seriously test their compliance with the axioms. In fact, `gzip`, `bzip2`, `ppmz`, `gencompress`, and others, do **not** satisfy the normality axioms, despite being recommended.
 
 ## Compression
-PLM-1 operates on binary streams using arithmetic coding to compress each bit, builds predictive models based on dynamic contexts, and usees a neutral networks to perform context mixing, blending the models to give a better prediction. This approach is heavily inspired by paq7/paq8, which themselves nearly satisfy the axioms. However PLM-1 is written in C, and a good deal simpler. This makes it easier to perform research with.
+PLM-1 operates on binary streams using arithmetic coding to compress each bit, builds predictive models based on dynamic contexts, and usees a neutral networks to perform context mixing, blending the models to give a better prediction. This approach is heavily inspired by `paq7`/`paq8`, which themselves nearly satisfy the axioms. However PLM-1 is written in C, and a good deal simpler. This makes it easier to perform research with.
 
 
