@@ -12,6 +12,6 @@ They also proposed a number of popular compression algorithms to be used, howeve
 ## Compression
 PLM-1 operates on binary streams using arithmetic coding to compress each bit, builds predictive models based on dynamic contexts, and usees a neutral network to perform context mixing, blending the models to give a better prediction. 
 
-This approach is heavily inspired by `paq7`/`paq8`, which themselves nearly satisfy the axioms. However PLM-1 is written in C, and a good deal simpler. This makes it easier to perform research with.
+This approach is heavily inspired by `paq7`/`paq8`, which themselves nearly satisfy the axioms. However PLM-1 is written in C (rather than C++) and is a good deal simpler. This makes it easier to perform research with.
 
 
