@@ -1,1 +1,0 @@
-plot "prob.smooth.err.bit0" with lines, "prob.smooth.err.bit1" with lines, "prob.smooth.err.bit2" with lines, "prob.smooth.err.bit3" with lines, "prob.smooth.err.bit4" with lines, "prob.smooth.err.bit5" with lines, "prob.smooth.err.bit6" with lines, "prob.smooth.err.bit7" with lines

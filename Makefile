@@ -1,36 +1,36 @@
 #########################
-# Configure build      
+# Configure build
 #########################
 CPP_COMPILER=gcc
 ASM_COMPILER=yasm
 
 #
-#  optimize  
-#  level 3    
-#         \    
-CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX #-ffast-math 
-LD_FLAGS=-lm 
-#	  /    
-#      math   
+#  optimize
+#  level 3
+#         \
+CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX #-ffast-math
+LD_FLAGS=-lm
+#	  /
+#      math
 #
 # NOTE on -ffast-math
 #
-# First, breaks strict IEEE compliance, e.g. allows re-ordering of 
+# First, breaks strict IEEE compliance, e.g. allows re-ordering of
 # instructions to a mathematical equivalent, which may not be IEEE
-# floating-point equivalent. 
+# floating-point equivalent.
 #
-# Second, disables setting errno after single-instruction math functions, 
+# Second, disables setting errno after single-instruction math functions,
 # avoiding a write to a thread-local variable (can produce 100% speedup on
-# certain architectures). 
+# certain architectures).
 #
-# Third, assumes finite math only, meaning no checks for NaN (or 0) are 
-# made where they would normally be. It is assumed these values will never 
-# appear. 
+# Third, assumes finite math only, meaning no checks for NaN (or 0) are
+# made where they would normally be. It is assumed these values will never
+# appear.
 #
-# Fourth, enables reciprocal approximations for division and reciprocal 
+# Fourth, enables reciprocal approximations for division and reciprocal
 # square root.
 #
-# Fifth, disables signed zero (even if the compile target supports it) 
+# Fifth, disables signed zero (even if the compile target supports it)
 # and rounding math, which enables optimizations e.g. constant folding.
 #
 # Sixth, generates code assuming no hardware interrupts occur in math
@@ -39,10 +39,10 @@ LD_FLAGS=-lm
 #
 
 #########################
-# Configure files 
+# Configure files
 #########################
 
-HUG_SOURCES=main.c \
+PLM_SOURCES=main.c \
 	    util.c \
 	    coder.c \
 	    mixer.c \
@@ -50,31 +50,31 @@ HUG_SOURCES=main.c \
 	    context.c \
 	    model.c \
 
-	
-HUG_OBJECTS=$(HUG_SOURCES:.c=.o)
+
+PLM_OBJECTS=$(PLM_SOURCES:.c=.o)
 ASM_SOURCES=asm/paq7asm-x86_64.asm
 ASM_OBJECTS=$(ASM_SOURCES:.asm=.o)
 
 #########################
-# Configure rules 
+# Configure rules
 #########################
 
-all: hug 
+all: plm
 
-test: hug 
-	./hug dat/csf.txt
-	./hug -d csf.txt.hug csf.out
-	diff csf.out dat/csf.txt 
-	rm csf.out csf.txt.hug
+test: plm
+	./plm dat/csf.txt
+	./plm -d csf.txt.plm csf.out
+	diff csf.out dat/csf.txt
+	rm csf.out csf.txt.plm
 
-hug: $(HUG_SOURCES) asm
-	$(CPP_COMPILER) $(CC_FLAGS) $(HUG_SOURCES) $(ASM_OBJECTS) -o hug 
+plm: $(PLM_SOURCES) asm
+	$(CPP_COMPILER) $(CC_FLAGS) $(PLM_SOURCES) $(ASM_OBJECTS) -o plm
 
 asm: $(ASM_SOURCES)
 	$(ASM_COMPILER) $(ASM_SOURCES) -f elf -m amd64
 
 install:
-	cp hug /usr/local/bin
+	cp plm /usr/local/bin
 
 clean:
-	rm -f $(HUG_OBJECTS) $(ASM_OBJECTS) hug gmon.out 
+	rm -f $(PLM_OBJECTS) $(ASM_OBJECTS) plm gmon.out

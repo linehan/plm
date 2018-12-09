@@ -1,12 +1,8 @@
 # Junk left behind by...
 # autotools
-        doc/*.aux
-        doc/*.log
-        doc/*.pdf
-        doc/*.out
-        doc/*.pyg
-        doc/.Makefile.sw*
-        doc/.*.sw*
+        *.log
+        *.cache
+        *.m4
         *.o
         */*/*.o
         depcomp
@@ -25,19 +21,4 @@
 # vim
         *.swp
         .*.sw*
-
-# Big files that shouldn't be accidentally committed
-        *.pdf
-        *.djvu
-        *.jpg
-        *.jpeg
-        *.Jpg
-        *.Jpeg
-        *.JPG
-        *.JPEG
-        *.gif
-        *.Gif
-        *.GIF
-        *.png
-        *.Png
-        *.PNG
+        */*/.*.sw* # ffs

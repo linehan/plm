@@ -3,14 +3,11 @@
 #include <string.h>
 #include "context.h"
 /*
- *
- *
  * TODO TODO TODO NOTE
  * TODO TODO TODO NOTE
- *  
+ *
  * HEY!
- * DON"T FUCKING USE THIS FILE UNLESS YOU
- * HAVE INITIALIZED THE PRNG BY RUNNING
+ * DON'T USE THIS FILE UNLESS YOU HAVE INITIALIZED THE PRNG BY RUNNING
  * PRNG_INIT().
  */
 
@@ -43,12 +40,12 @@ uint32_t prng(void)
                 prng_is_init = 1;
         }
         prng_i++;
-        
+
         return prng_table[prng_i&63] = prng_table[prng_i-24&63]^prng_table[prng_i-55&63];
 }
 
 /******************************************************************************
- * STATE TABLE 
+ * STATE TABLE
  ******************************************************************************/
 
 // State table:
@@ -143,7 +140,7 @@ int State_count[255] = {0};
 
 
 /******************************************************************************
- * State map 
+ * State map
  * A StateMap maps a nonstationary counter state to a probability.
  * After each mapping, the mapping is adjusted to improve future
  * predictions.  Methods:
@@ -171,14 +168,14 @@ void statemap_init(struct statemap_t *sm)
         for (i=0; i<256; i++) {
                 n0 = nex(i, 2);
                 n1 = nex(i, 3);
-    
+
                 if (n0 == 0) {
                         n1 *= 64;
                 }
                 if (n1 == 0) {
                         n0 *= 64;
                 }
-    
+
                 sm->table[i] = 65536*(n1+1)/(n0+n1+2);
         }
 }
@@ -192,7 +189,7 @@ int statemap_predict(struct statemap_t *sm, int context, int bit)
         State_count[sm->context] += 1;
 
         sm->context = context;
-        
+
         return sm->table[sm->context] >> 4;
 }
 
@@ -218,25 +215,25 @@ void print_statemap_counts(void)
 //
 //
 //  here it is...
-inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm) 
+inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
 {
         int p1 = statemap_predict(sm, s, bit);
         int n0 = nex(s, 2);
         int n1 = nex(s, 3);
         int st = stretch(p1) >> 2;
-        
+
         /*printf("add:%d\n", st);*/
         nn_input(mixer, st);
-        
+
         p1 >>= 4;
-        
+
         int p0 = 255 - p1;
 
         /*printf("add:%d\n", st*(!n0-!n1));*/
         /*printf("add:%d\n", st*(!n0-!n1));*/
         /*printf("add:%d\n", (p1&-!n0)-(p0&-!n1));*/
         /*printf("add:%d\n", (p1&-!n1)-(p0&-!n0));*/
-        
+
         nn_input(mixer, p1-p0);
         nn_input(mixer, st*(!n0-!n1));
         nn_input(mixer, (p1&-!n0)-(p0&-!n1));
@@ -249,7 +246,7 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
 
 
 /******************************************************************************
- * CONTEXT STORAGE 
+ * CONTEXT STORAGE
  ******************************************************************************/
 /*
  * Predicts the next bit of a non-stationary process.
@@ -264,35 +261,35 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
  * Each bucket has an 8-bit LRU queue, seven 16-bit
  * checksums, and seven 7-byte history arrays.
  *
- * Each "element" in the bucket gets one checksum, 
+ * Each "element" in the bucket gets one checksum,
  * and one 7-byte history array.
  *
  * An item of the array is a state, simply one of
  * the 256 possible bytes you could see reading
- * from the source. 
+ * from the source.
  *
  * The queue contains the indices of the two most
- * recently used elements in the bucket. 
+ * recently used elements in the bucket.
  *
  *      queue = 0000 0000
  *               |      \
  *         index of    index of most-recently
  *         next-most   used element in bucket.
  *         recently
- *         used element 
- *         in bucket.   
+ *         used element
+ *         in bucket.
  *
- * 
- * In the event that a context ends on a byte boundary, 
+ *
+ * In the event that a context ends on a byte boundary,
  * then rather than store 7 distinct recently-seen states,
  * the array will become a run model:
  *
  *         B0       B1       B2       B3       B4       B5       B6
  *      00000000 00000000 00000000 00000000 00000000 00000000 00000000
  *                                 \     /|    |     \               /
- *       state    state    state    count |   last    two bytes seen before 
+ *       state    state    state    count |   last    two bytes seen before
  *                                 (0-127)|   byte    first appearance of B4.
- *                                        |   seen 
+ *                                        |   seen
  *                                     flag  (poss.
  *                                            repeated)
  *
@@ -304,7 +301,7 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
  *
  * Memory for the bytes B5 and B6 is not zeroed, so if the flag is
  * set to 1:
- *      B6 is valid only if (count >= 3), and 
+ *      B6 is valid only if (count >= 3), and
  *      B5 is valid only if (count >= 2).
  */
 /**
@@ -321,11 +318,11 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
  * NOTE: THE ORDER OF THE MEMBERS OF THIS STRUCT
  *       IS NOT AN ACCIDENT. CHANGING THE ORDER
  *       WILL FOUL THE ALIGNMENT AND PADDING OF
- *       THE DATA STRUCTURE, IMPACTING THE CACHE 
+ *       THE DATA STRUCTURE, IMPACTING THE CACHE
  *       AND HARMING PERFORMANCE
  */
 /* LATER NOTE (11 June 2018):
- *      You must view this as a bucket. 
+ *      You must view this as a bucket.
  *
  *      Each bucket is 64-bytes (512 bits) in size.
  *      It contains a 1-byte LRU queue modeled as above, with
@@ -333,10 +330,10 @@ inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
  *      which was LRU.
  *
  *      Then there are 7 slots. Each slot contains a 2-byte (16-bit) checksum
- *      and an array of 7 bytes serving as a bit history. 
+ *      and an array of 7 bytes serving as a bit history.
  *
  *      Each slot is indexed by the last 0-2 bits of context (i.e. a 3-bit
- *      value, and 2^3 = 8). 
+ *      value, and 2^3 = 8).
  *
  *              So we could alternatively write it as
  *
@@ -372,10 +369,10 @@ struct nsm_hash_item_t {
  *
  * @item    : Hash bucket reference
  * @checksum: Checksum to either find collision or create new item for
- * Return   : Value for checksum 
+ * Return   : Value for checksum
  */
 
- /* 
+ /*
   * Updating the history:
   *
   *     0. The current context is updated with the new bit.
@@ -390,7 +387,7 @@ struct nsm_hash_item_t {
   *
   *             If no match is found, the element with the lowest
   *             priority among the 5 elements NOT in the LRU queue
-  *             is replaced. 
+  *             is replaced.
   *
   *             The priority is the state number of the first element
   *             (the one with 0 additional bits of context).
@@ -405,7 +402,7 @@ struct nsm_hash_item_t {
   *             In all cases, the found/replaced element is put in
   *             the front of the queue.
   */
-uint8_t* hash_get(struct nsm_hash_item_t *item, uint16_t ch) 
+uint8_t* hash_get(struct nsm_hash_item_t *item, uint16_t ch)
 {
   if (item->checksum[item->queue&15]==ch) {
           /*printf("match:%d\n", ch);*/
@@ -433,30 +430,30 @@ uint8_t *nsm_hash_get(struct nsm_hash_item_t *item, uint16_t checksum)
         int index    = 0;      /* Index of the element to get returned */
         int i        = 0;      /* Index used during linear probe */
 
-        /* 
+        /*
          * If it's the most recently-used, we don't need
          * to update the table, just return the same item.
-         * 
-         * Note the use of BITWISE AND to isolate the lower 
-         * nibble 
+         *
+         * Note the use of BITWISE AND to isolate the lower
+         * nibble
          */
-        if (item->checksum[item->queue & 0x0F] == checksum) { 
+        if (item->checksum[item->queue & 0x0F] == checksum) {
                 /*printf("match:%d\n", checksum);*/
                 return &item->history[item->queue & 0x0F][0];
         }
 
-        /* 
-         * Run a linear probe on the table, searching for a 
+        /*
+         * Run a linear probe on the table, searching for a
          * matching checksum. If none is found, select one
-         * of the elements and replace it with ours. 
-         */ 
+         * of the elements and replace it with ours.
+         */
         for (i=0; i<7; i++) {
-                if (item->checksum[i] == checksum) { 
-                        /* 
-                         * Left-shift by 4 bits pushes the upper nibble 
-                         * into oblivion, the lower nibble into the upper 
+                if (item->checksum[i] == checksum) {
+                        /*
+                         * Left-shift by 4 bits pushes the upper nibble
+                         * into oblivion, the lower nibble into the upper
                          * nibble, and shifts 4 fresh 0 bits into the lower
-                         * nibble, which we BITWISE OR the new index into. 
+                         * nibble, which we BITWISE OR the new index into.
                          */
                         item->queue = (item->queue << 4) | i;
 
@@ -464,38 +461,38 @@ uint8_t *nsm_hash_get(struct nsm_hash_item_t *item, uint16_t checksum)
                         return &item->history[i][0];
                 }
 
-                /* 
-                 * The priority is simply the value of the first state 
-                 * in the history array under that index. 
+                /*
+                 * The priority is simply the value of the first state
+                 * in the history array under that index.
                  */
                 priority = item->history[i][0];
 
                 if (i!=(item->queue & 0x0F) /* Don't replace the LRU items */
-                &&  i!=(item->queue & 0xF0) 
+                &&  i!=(item->queue & 0xF0)
                 &&  priority<lowest) {
                         lowest = priority;
                         index  = i;
                 }
         }
-  
+
         /* Place the decided-upon index into the LRU queue */
         item->queue           = 0xF0 | index;
-        
+
         /* Set the checksum in the checksum array */
         item->checksum[index] = checksum;
 
         /*printf("no match:%d\n", checksum);*/
-        
-        /* 
+
+        /*
          * Zero the 7-bytes of that element's history array,
-         * and return the address of the array. 
+         * and return the address of the array.
          */
         return (uint8_t *)memset(&item->history[index][0], 0, 7);
 }
 
 
 /******************************************************************************
- * "NSM" thing 
+ * "NSM" thing
  ******************************************************************************/
 
 /**
@@ -510,8 +507,8 @@ uint8_t *nsm_hash_get(struct nsm_hash_item_t *item, uint16_t checksum)
  */
 void nsm_init(struct nsm_t *map, int mem, int count)
 {
-        /* 
-         * mem>>6 == mem/2^6 == mem/64 
+        /*
+         * mem>>6 == mem/2^6 == mem/64
          * This is the number of buckets we will have
          * (each bucket is 64 bytes = 512 bits)
          */
@@ -524,12 +521,12 @@ void nsm_init(struct nsm_t *map, int mem, int count)
         map->statemap = calloc(1, map->num_contexts*sizeof(struct statemap_t));
 
         for (i=0; i<map->num_contexts; i++) {
-                statemap_init(&map->statemap[i]); 
+                statemap_init(&map->statemap[i]);
         }
 
-        /* 
+        /*
          * Why do we not rather have an array of this struct, than
-         * arrays of (most of) its members? 
+         * arrays of (most of) its members?
          */
         map->cur          = (uint8_t **)calloc(1, count*sizeof(uint8_t *));
         map->arr          = (uint8_t **)calloc(1, count*sizeof(uint8_t *));
@@ -558,19 +555,19 @@ void nsm_init(struct nsm_t *map, int mem, int count)
 void nsm_set(struct nsm_t *map, uint32_t cx)
 {
         int i;
-       
+
         i = map->next_context++;
         uint32_t savecx = cx;
-  
+
         assert(i>=0 && i<map->num_contexts);
-  
+
         /* Permute (don't hash) cx to spread the distribution */
         cx = cx*987654323 + i;
-  
+
         cx = cx<<16 | cx>>16;
 
         /*printf("i:%d got:%d set:%d\n", i, savecx, cx * 123456791 + i);*/
-  
+
         map->context[i] = cx * 123456791 + i;
 
         Context_count++;
@@ -581,7 +578,7 @@ uint8_t *nsm_select(struct nsm_t *map, int i, int jump)
         struct nsm_hash_item_t *bucket;
         int                     index;
 
-        /* 
+        /*
          * TODO: This "jump" thing is not correct. Something
          * is going on so that the index is the 2 low-order
          * bits of the context.
@@ -590,7 +587,7 @@ uint8_t *nsm_select(struct nsm_t *map, int i, int jump)
          */
         index  = map->context[i] + jump & (map->size-1);
         bucket = &map->table[index];
-        
+
                                         /* This is where the checksum lives */
         return hash_get(bucket, map->context[i] >> 16);
 }
@@ -620,11 +617,11 @@ uint8_t *nsm_update(struct nsm_t *map, int i, uint32_t ctx, uint8_t last_byte, i
                  * Update pending bit histories for bits 2-7
                  */
                 if (bpos == 0) {
-                        /* 
+                        /*
                          * There has been a repeat.
                          */
                         if (map->arr[i][3] == 2) {
-                                /* 
+                                /*
                                  * Let c be the repeated byte plus
                                  * 256.
                                  */
@@ -651,28 +648,28 @@ uint8_t *nsm_update(struct nsm_t *map, int i, uint32_t ctx, uint8_t last_byte, i
 
                                 map->arr[i][6] = 0;
                         }
-                        
-                        /* No repeats yet */ 
-                        if (map->run[i][0] == 0) { 
-                                /* 
+
+                        /* No repeats yet */
+                        if (map->run[i][0] == 0) {
+                                /*
                                  * NOTE: Setting the count to
                                  * 2 is actually setting it to
-                                 * 1, since the lowest-order 
+                                 * 1, since the lowest-order
                                  * bit is a flag.
                                  *
                                  *      2 DEC == 00000010 BIN
                                  */
                                 map->run[i][0] = 2;
 
-                                /* 
+                                /*
                                  * Set the byte that might
                                  * be repeated
                                  */
                                 map->run[i][1] = c1;
 
-                        /* 
+                        /*
                          * A new byte has been seen, so the
-                         * run has ended. 
+                         * run has ended.
                          */
                         } else if (map->run[i][1] != c1) {
                                 /* Set the flag to 1 */
@@ -684,16 +681,16 @@ uint8_t *nsm_update(struct nsm_t *map, int i, uint32_t ctx, uint8_t last_byte, i
                          * The count is less than 254
                          */
                         } else if (map->run[i][0]<254) {
-                                /* 
+                                /*
                                  * Increment the count by 2.
-                                 * (Rather than 1, so we 
-                                 * aren't touching the flag 
+                                 * (Rather than 1, so we
+                                 * aren't touching the flag
                                  * bit)
                                  */
                                 map->run[i][0] += 2;
                         }
 
-                        /* 
+                        /*
                          * Update the runpointer to be
                          * 3 items down the head of the
                          * array.
@@ -709,7 +706,7 @@ uint8_t *nsm_update(struct nsm_t *map, int i, uint32_t ctx, uint8_t last_byte, i
         return NULL;
 }
 
-void nsm_newbit(struct nsm_t *map, int i, int bit) 
+void nsm_newbit(struct nsm_t *map, int i, int bit)
 {
         assert(map->cur[i]>=&map->table[0].history[0][0] && map->cur[i]<=&map->table[map->size-1].history[6][6]);
         if (((long)(map->cur[i])&63) < 15) {
@@ -720,9 +717,9 @@ void nsm_newbit(struct nsm_t *map, int i, int bit)
 
         /* Get a new state */
         int ns = nex(*map->cur[i], bit);
-        
+
         /* Probabilistic increment of the 1's and 0's counts */
-        if (ns >= 204 && prng() << (452-ns>>3)) { 
+        if (ns >= 204 && prng() << (452-ns>>3)) {
                 ns -= 4;
         }
 
@@ -740,7 +737,7 @@ int nsm_predict(struct nsm_t *map, int i, uint8_t last_byte, int last_byte_bits)
 
                 /* Predicted bit + for 1, - for 0 */
                 /* Will be +-1 */
-                int b = (map->run[i][1]>>7-last_byte_bits&1)*2-1;  
+                int b = (map->run[i][1]>>7-last_byte_bits&1)*2-1;
                 int c = ilog(rc+1)<<2+(~rc&1);
 
                 /*printf("runp[%d][1]:%d \n", i, map->run[i][1]);*/
@@ -764,21 +761,21 @@ int nsm_predict(struct nsm_t *map, int i, uint8_t last_byte, int last_byte_bits)
  * @bp   : bpos
  * @c1   : buf(1)
  * @y1   : y
- * Return: Some result 
+ * Return: Some result
  */
 int nsm_mix(struct nsm_t *map, struct nn_t *mixer, uint32_t ctx, uint8_t last_byte, int last_byte_bits, int last_bit)
 {
         int result=0;
         int i;
 
-        /* 
+        /*
          * For all current contexts.
-         */ 
+         */
         /*printf("next_ctx:%d\n", map->next_context);*/
         for (i=0; i<map->next_context; ++i) {
-                /* 
+                /*
                  * Update each of the current contexts
-                 * with the new bit. 
+                 * with the new bit.
                  */
                 if (map->cur[i]) {
                         nsm_newbit(map, i, last_bit);
@@ -787,16 +784,16 @@ int nsm_mix(struct nsm_t *map, struct nn_t *mixer, uint32_t ctx, uint8_t last_by
                 /* Update the run model */
                 map->cur[i] = nsm_update(map, i, ctx, last_byte, last_byte_bits);
 
-                /* 
+                /*
                  * Predict from last byte in context
                  */
                 nn_input(mixer, nsm_predict(map, i, last_byte, last_byte_bits));
-                
+
                 /* Predict from bit context */
                 result += mix2(mixer, map->cur[i] ? *map->cur[i] : 0, last_bit, &map->statemap[i]);
         }
 
-        if (last_byte_bits == 7) { 
+        if (last_byte_bits == 7) {
                 /* We've read a whole byte. Time to move on. */
                 map->next_context = 0;
         }

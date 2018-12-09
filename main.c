@@ -1,6 +1,6 @@
-#define NAME      "hug"  
-#define EXTENSION "hug"
-// #define NO_LOGGING_PLEASE  
+#define NAME      "plm"
+#define EXTENSION "plm"
+// #define NO_LOGGING_PLEASE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,11 +20,11 @@
 #include "context.h"
 
 /******************************************************************************
- * GLOBAL STATE 
+ * GLOBAL STATE
  ******************************************************************************/
 
 /* Compression level (0-9) */
-int level = DEFAULT_OPTION;  
+int level = DEFAULT_OPTION;
 
 /* COMPRESS OR DECOMPRESS (defined in util.h) */
 int MODE;
@@ -90,9 +90,8 @@ struct io_t io = {
 };
 
 /******************************************************************************
- * FUNCTIONS 
+ * FUNCTIONS
  ******************************************************************************/
-
 
 /**
  * compress()
@@ -102,9 +101,9 @@ struct io_t io = {
  * @filename: Path of source file
  * @filesize: Size of source file
  * @enc     : Encoder object
- * Return   : Nothing 
+ * Return   : Nothing
  */
-void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac) 
+void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
 {
         int i;
         int j;
@@ -121,7 +120,7 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
 
                         io.bit = (io.byte >> j) & 1;
 
-                        /* 
+                        /*
                          * Add the bit to the partially-read
                          * byte.
                          */
@@ -139,14 +138,14 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
                         io.bit_count++;
 
                         if (io.part > 256) {
-                                /* 
+                                /*
                                  * Add the full byte (sans trailing '1')
-                                 * to the word history 
+                                 * to the word history
                                  */
                                 io.word = (io.word << 8) + io.byte;
 
                                 /*
-                                 * Add the full byte (sans trailing '1') 
+                                 * Add the full byte (sans trailing '1')
                                  * to the byte history buffer.
                                  */
                                 io.buf[io.byte_count & io.buf_size-1] = io.byte;
@@ -157,7 +156,7 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
                                  */
                                 io.byte_count++;
 
-                                /* 
+                                /*
                                  * Use a trailing '1' bit here to ensure
                                  * that consecutive zeroes are hashed to
                                  * something different as this '1' gets
@@ -196,13 +195,13 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
 
                                 io.err_byte_smooth += io.err_byte_smooth_tmp;
                                 io.err_byte_raw    += io.err_byte_raw_tmp;
-                                
+
                                 log_msg(LOG_ERR_BYTE_PSMOOTH, "%d %g\n", io.byte_count, (float)io.err_byte_smooth/(float)io.byte_count);
                                 log_msg(LOG_ERR_BYTE_PRAW, "%d %g\n", io.byte_count, (float)io.err_byte_raw/(float)io.byte_count);
 
                                 io.avg_byte_smooth += abs((io.avg_byte_smooth_tmp-2048));
                                 io.avg_byte_raw    += abs((io.avg_byte_raw_tmp-2048));
-                                
+
                                 log_msg(LOG_AVG_BYTE_PSMOOTH, "%d %g\n", io.byte_count, (float)io.avg_byte_smooth/(float)io.byte_count);
                                 log_msg(LOG_AVG_BYTE_PRAW, "%d %g\n", io.byte_count, (float)io.avg_byte_raw/(float)io.byte_count);
 
@@ -256,13 +255,13 @@ void compress(FILE *dst, FILE *src, long src_size, struct ac_t *ac)
  * decompress()
  * ````````````
  * Decompress a file.
- * 
- * @path : Intended path of target (decompressed) file. 
+ *
+ * @path : Intended path of target (decompressed) file.
  * @size : Intended size of target (decomrpessed) file (recorded in header)
  * @enc  : Encoder object
  * Return: Nothing
  */
-void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac) 
+void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
 {
         int i;
         int j;
@@ -277,13 +276,13 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                         /* Decode a bit */
                         io.bit = ac_decoder_get_bit(ac, io.pr);
 
-                        /* 
+                        /*
                          * Add the bit to the partially-read
                          * byte.
                          */
                         io.part = (io.part << 1) | io.bit;
 
-                        /* 
+                        /*
                          * Keep building up the "real" byte,
                          * without the leading 1.
                          */
@@ -301,14 +300,14 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                         io.bit_count++;
 
                         if (io.part > 256) {
-                                /* 
+                                /*
                                  * Add the full byte (sans trailing '1')
-                                 * to the word history 
+                                 * to the word history
                                  */
                                 io.word = (io.word << 8) + io.byte;
 
                                 /*
-                                 * Add the full byte (sans trailing '1') 
+                                 * Add the full byte (sans trailing '1')
                                  * to the byte history buffer.
                                  */
                                 io.buf[io.byte_count & io.buf_size-1] = io.byte;
@@ -319,7 +318,7 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                                  */
                                 io.byte_count++;
 
-                                /* 
+                                /*
                                  * Use a trailing '1' bit here to ensure
                                  * that consecutive zeroes are hashed to
                                  * something different as this '1' gets
@@ -349,7 +348,7 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                                 /* Try to add it to the encoder */
                                 if (!ac_decoder_try_add_byte(ac, next_byte)) {
                                         /* Push it back if unsuccessful */
-                                        ungetc(next_byte, src);    
+                                        ungetc(next_byte, src);
                                         break;
                                 }
                         }
@@ -362,7 +361,7 @@ void decompress(FILE *dst, FILE *src, long dst_size, struct ac_t *ac)
                 }
 
                 /* Write the decoded byte to the destination. */
-                putc(io.byte, dst); 
+                putc(io.byte, dst);
         }
 }
 
@@ -370,7 +369,7 @@ FILE *stream_to_file(FILE *stream)
 {
         FILE *file;
         int   ch;
-        
+
         /* Will be destroyed when program ends or file closed */
         file = tmpfile();
 
@@ -397,10 +396,10 @@ void print_usage_and_exit(char *bad_part)
 }
 
 /******************************************************************************
- * MAIN 
+ * MAIN
  ******************************************************************************/
 
-int main(int argc, char** argv) 
+int main(int argc, char** argv)
 {
         level = DEFAULT_OPTION;
 
@@ -434,7 +433,7 @@ int main(int argc, char** argv)
 
         switch (argc) {
         case 2:
-                source_file = stream_to_file(stdin);   
+                source_file = stream_to_file(stdin);
                 source_path = "STDIN";
                 target_path = "STDOUT";
                 target_file = stdout;
@@ -447,7 +446,7 @@ int main(int argc, char** argv)
                 } else {
                         source_path = argv[2];
                         target_file = stdout;
-                        target_path = "STDOUT"; 
+                        target_path = "STDOUT";
                 }
                 break;
         case 4:
@@ -488,102 +487,18 @@ int main(int argc, char** argv)
                 break;
         }
 
-        /*if (!strcmp(argv[1], "-d")) {*/
-
-                /*MODE = DECOMPRESS;*/
-
-                /*switch (argc) {*/
-                /*case 1:*/
-                        /*source_file = stream_to_file(stdin);   */
-                        /*source_path = "STDIN";*/
-                        /*break;*/
-                /*case 2:*/
-                        /*if (!strcmp(argv[2], "-o")) {*/
-                                /*print_usage_and_exit(NULL);*/
-                        /*} else if (argv[2][0] == '-') {*/
-                                /*print_usage_and_exit(argv[2]);*/
-                        /*} else {*/
-                                /*target_path = argv[2]; */
-                        /*}*/
-                        /*break;*/
-                /*case 3:*/
-                        /*if (!strcmp(argv[2], "-o")) {*/
-                                /*if (argv[3][0] == '-') {*/
-                                        /*print_usage_and_exit(argv[3]);*/
-                                /*} else {*/
-                                        /*target_path = argv[3];*/
-                                /*}*/
-                        /*} else {*/
-                                /*print_usage_and_exit(NULL);*/
-                        /*}*/
-                        /*break;*/
-                /*case 4:*/
-                        /*if (!strcmp(argv[2], "-o")) {*/
-                                /*print_usage_and_exit(NULL);*/
-                        /*} else if (argv[2][0] == '-') {*/
-                                /*print_usage_and_exit(argv[2]);*/
-                                /*exit(0);*/
-                        /*} else {*/
-                                /*source_path = argv[2];*/
-                        /*}*/
-
-                        /*if (!strcmp(argv[3], "-o")) {*/
-                                /*if (argv[4][0] == '-') {*/
-                                        /*printf("I don't know '%s'.\n", argv[4]);*/
-                                        /*printf("USAGE: "NAME" -c [<input>] [-o <output]\n");*/
-                                        /*exit(0);*/
-                                /*} else {*/
-                                        /*target_path = argv[4];*/
-                                /*}*/
-                        /*}*/
-                        /*break;*/
-                /*default:*/
-                        /*printf("USAGE: "NAME" -c [<input>] [-o <output]\n");*/
-                        /*exit(0);*/
-                        /*break;*/
-                /*}*/
-        /*}*/
-
-
-        /*if (!strcmp(argv[1], "-d")) {*/
-
-                /*if (argc <= 3) {*/
-                        /*printf("USAGE:"NAME" -d <input> <output>\n");*/
-                        /*exit(1);*/
-                /*}*/
-
-                /*MODE = DECOMPRESS;*/
-
-                /*source_path = argv[2];*/
-                /*target_path = argv[3];*/
-
-        /*} else {*/
-                /*MODE = COMPRESS;*/
-
-                /*source_path = argv[1];*/
-        /*}*/
-
         ilog_init();    // TODO: fix this shit!
         stretch_init(); // TODO: fix this shit!
         log_init();
 
-        /*if (target_file == NULL) {*/
-                /*target_file = fopen(target_path, "rb");*/
-                /*if ((target_file = fopen(target_path, "rb"))) {*/
-                        /*printf("File exists.\n");*/
-                        /*fclose(target_file);*/
-                        /*return 1;*/
-                /*}*/
-        /*}*/
-        
         if (source_file == NULL) {
                 source_file = fopen(source_path, "rb");
         }
 
         if (target_file == NULL) {
                 /*
-                 * If an output file already exists, then we will 
-                 * compare the result of this decompression with 
+                 * If an output file already exists, then we will
+                 * compare the result of this decompression with
                  * its contents.
                  */
                 if ((target_file = fopen(target_path, "rb"))) {
@@ -599,11 +514,11 @@ int main(int argc, char** argv)
                 }
         }
 
-        if (!target_file) { 
+        if (!target_file) {
                 fprintf(stderr, "Error creating %s\n", target_path);
                 exit(1);
         }
-        if (!source_file) { 
+        if (!source_file) {
                 fprintf(stderr, "Error opening %s\n", source_path);
                 exit(1);
         }
@@ -619,9 +534,9 @@ int main(int argc, char** argv)
                  * Header format:
                  *      program_name:level:source_size
                  */
-                fprintf(target_file, "%s:%d:%ld\r\n\x1A", 
+                fprintf(target_file, "%s:%d:%ld\r\n\x1A",
                         NAME,
-                        level, 
+                        level,
                         source_size
                 );
 
@@ -638,12 +553,12 @@ int main(int argc, char** argv)
                         /*exit(1);*/
                 /*}*/
 
-                /* 
+                /*
                  * Read header and get options
                  */
-                fscanf(source_file, "%255[^:]:%d:%ld\r\n\x1A", 
-                        &compressor, 
-                        &level, 
+                fscanf(source_file, "%255[^:]:%d:%ld\r\n\x1A",
+                        &compressor,
+                        &level,
                         &target_size
                 );
 
@@ -653,8 +568,8 @@ int main(int argc, char** argv)
                         fprintf(stderr, "%s: not a "NAME" file\n", source_path);
                         exit(1);
                 }
-                
-                if (level<0 || level>9) { 
+
+                if (level<0 || level>9) {
                         level = DEFAULT_OPTION;
                 }
 
@@ -665,7 +580,7 @@ int main(int argc, char** argv)
         }
 
         if (MODE == COMPRESS) {
-        
+
                 ac_init(&ac, target_file);
 
                 /*if (!(source_file = fopen(source_path, "rb"))) {*/
@@ -683,8 +598,8 @@ int main(int argc, char** argv)
                 ac_init(&ac, source_file);
 
                 /*
-                 * If an output file already exists, then we will 
-                 * compare the result of this decompression with 
+                 * If an output file already exists, then we will
+                 * compare the result of this decompression with
                  * its contents.
                  */
                 /*if ((target_file = fopen(target_path, "rb"))) {*/
