@@ -42,13 +42,13 @@ LD_FLAGS=-lm
 # Configure files
 #########################
 
-PLM_SOURCES=main.c \
-	    util.c \
-	    coder.c \
-	    mixer.c \
-	    predictor.c \
-	    context.c \
-	    model.c \
+PLM_SOURCES=src/main.c \
+	    src/util.c \
+	    src/coder.c \
+	    src/mixer.c \
+	    src/predictor.c \
+	    src/context.c \
+	    src/model.c \
 
 
 PLM_OBJECTS=$(PLM_SOURCES:.c=.o)
