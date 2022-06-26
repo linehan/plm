@@ -8,7 +8,8 @@ ASM_COMPILER=yasm
 #  optimize
 #  level 3
 #         \
-CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX #-ffast-math
+#		  |
+CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX -ffast-math
 LD_FLAGS=-lm
 #	  /
 #      math
@@ -62,8 +63,9 @@ ASM_OBJECTS=$(ASM_SOURCES:.asm=.o)
 all: plm
 
 test: plm
-	./plm dat/csf.txt
-	./plm -d csf.txt.plm csf.out
+	rm -f csf.txt.plm csf.out
+	./plm -c dat/csf.txt -o csf.txt.plm
+	./plm -d csf.txt.plm -o csf.out
 	diff csf.out dat/csf.txt
 	rm csf.out csf.txt.plm
 
@@ -77,4 +79,4 @@ install:
 	cp plm /usr/local/bin
 
 clean:
-	rm -f $(PLM_OBJECTS) $(ASM_OBJECTS) plm gmon.out
+	rm -f $(PLM_OBJECTS) plm gmon.out

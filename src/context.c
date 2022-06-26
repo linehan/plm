@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "context.h"
+
+int Context_count;
 /*
  * TODO TODO TODO NOTE
  * TODO TODO TODO NOTE
@@ -215,7 +217,7 @@ void print_statemap_counts(void)
 //
 //
 //  here it is...
-inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
+static inline int mix2(struct nn_t *mixer, int s, int bit, struct statemap_t *sm)
 {
         int p1 = statemap_predict(sm, s, bit);
         int n0 = nex(s, 2);

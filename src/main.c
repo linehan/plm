@@ -1,6 +1,6 @@
 #define NAME      "plm"
 #define EXTENSION "plm"
-// #define NO_LOGGING_PLEASE
+#define NO_LOGGING_PLEASE
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -22,6 +22,7 @@
 /******************************************************************************
  * GLOBAL STATE
  ******************************************************************************/
+extern int Context_count;
 
 /* Compression level (0-9) */
 int level = DEFAULT_OPTION;
@@ -556,11 +557,14 @@ int main(int argc, char** argv)
                 /*
                  * Read header and get options
                  */
-                fscanf(source_file, "%255[^:]:%d:%ld\r\n\x1A",
-                        &compressor,
+                if(!fscanf(source_file, "%255[^:]:%d:%ld\r\n\x1A",
+                        &compressor[0],
                         &level,
                         &target_size
-                );
+                )) {
+                        fprintf(stderr, "Error reading header\n");
+                        exit(1);
+                }
 
                 /*fprintf(stderr, "compressor:%s\nlevel:%d\ntarget-size:%ld\n", compressor, level, target_size);*/
 

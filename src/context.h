@@ -8,7 +8,7 @@
  * NONSTATIONARY MAP
  ******************************************************************************/
 
-int Context_count;
+extern int Context_count;
 
 struct nsm_t {
         int num_contexts;
