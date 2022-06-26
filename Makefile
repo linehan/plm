@@ -8,7 +8,8 @@ ASM_COMPILER=yasm
 #  optimize
 #  level 3
 #         \
-CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX #-ffast-math
+#		  |
+CC_FLAGS=-O3 -s -fomit-frame-pointer -DUNIX -ffast-math
 LD_FLAGS=-lm
 #	  /
 #      math
@@ -78,4 +79,4 @@ install:
 	cp plm /usr/local/bin
 
 clean:
-	rm -f $(PLM_OBJECTS) $(ASM_OBJECTS) plm gmon.out
+	rm -f $(PLM_OBJECTS) plm gmon.out
