@@ -22,3 +22,25 @@
         *.swp
         .*.sw*
         */*/.*.sw* # ffs
+
+# artifacts
+        plm
+
+
+# logs
+        log/*
+        *.log
+        
+# vscode 
+        .vscode/*
+        !.vscode/settings.json
+        !.vscode/tasks.json
+        !.vscode/launch.json
+        !.vscode/extensions.json
+        !.vscode/*.code-snippets
+
+# vscode history
+        .history/
+
+# vscode extensions
+        *.vsix
