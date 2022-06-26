@@ -62,8 +62,9 @@ ASM_OBJECTS=$(ASM_SOURCES:.asm=.o)
 all: plm
 
 test: plm
-	./plm dat/csf.txt
-	./plm -d csf.txt.plm csf.out
+	rm -f csf.txt.plm csf.out
+	./plm -c dat/csf.txt -o csf.txt.plm
+	./plm -d csf.txt.plm -o csf.out
 	diff csf.out dat/csf.txt
 	rm csf.out csf.txt.plm
 
